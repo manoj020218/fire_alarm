@@ -1,0 +1,181 @@
+You are developing professional ESP32-S3 firmware for JENIX FireGuard – Smart Fire Fighting System Monitoring.
+
+Project:
+FireGuard by JENIX
+PID: FIREGUARD-S3-01
+MCU: ESP32-S3 N16R8
+Purpose: RS485/Modbus based fire fighting equipment monitoring gateway.
+
+Important:
+Client confirmed all field equipment are RS485 based. So this gateway must mainly work as RS485 Modbus RTU Master and send all data to cloud MQTT/HTTP.
+
+Architecture:
+RS485 fire equipment -> ESP32-S3 FireGuard Gateway -> MQTT/HTTP -> Jenix Cloud -> PWA/APK dashboard.
+
+Field Equipment:
+1. Jockey Pump
+2. Main Pump 1
+3. Main Pump 2
+4. Diesel Pump
+5. Sprinkler Pressure
+6. Hydrant Pressure
+7. Water Tank Level
+8. Diesel Fuel Level
+9. DG Battery Voltage
+10. Fire Alarm Panel Status
+11. PA System Status
+12. Ventilation System Status
+13. Valve Status
+14. Any future RS485 Modbus device
+
+Communication:
+- RS485 Modbus RTU Master
+- Configurable baud rate: 9600 default, also 19200, 38400
+- Configurable parity: none default, even, odd
+- Configurable slave ID per equipment
+- Configurable register address per parameter
+- Support function code 03 and 04 initially
+- Future support for function code 01, 02, 05, 06, 16
+- MQTT primary
+- HTTP fallback
+- OTA update from VPS
+- Local Web UI for testing/configuration
+- BLE provisioning and AP mode provisioning
+
+Hardware Pins:
+Use clean config file for all pins.
+Default:
+RS485 RX = GPIO16
+RS485 TX = GPIO17
+RS485 DE_RE = GPIO18
+Status LED = onboard LED if available
+Buzzer optional
+Spare relay optional
+
+Firmware Features:
+1. Device boot with firmware version and release date.
+2. Standard SSID:
+   BLE/AP name: JNX-FG-XXXX
+   XXXX = last 4 characters of MAC.
+3. WiFi provisioning by BLE and AP fallback.
+4. Local web server after WiFi connected.
+5. Local page must show:
+   - Gateway status
+   - WiFi status
+   - MQTT status
+   - Cloud status
+   - RS485 scan
+   - Modbus read test
+   - Individual device test
+   - Register mapping page
+   - Firmware version and release date
+   - OTA update option
+6. NVS storage for all settings.
+7. Watchdog enabled.
+8. Auto reboot schedule configurable.
+9. Offline buffer if internet fails.
+10. Send heartbeat every 60 seconds.
+11. Send live telemetry every 10 seconds.
+12. Send alarm event immediately.
+13. Log Modbus timeout and CRC error.
+14. Detect RS485 device offline.
+15. Device health JSON must include uptime, heap, RSSI, reset reason, firmware version.
+
+Alarm Logic:
+- Each parameter has configurable threshold.
+- Example:
+  Sprinkler Pressure Low
+  Hydrant Pressure Low
+  Water Tank Level Low
+  Diesel Fuel Low
+  DG Battery Low
+  Pump Fault
+  Pump Offline
+  Fire Panel Alarm
+  Ventilation Fault
+- Alarm should have:
+  alarm_id
+  site_id
+  gateway_id
+  device_id
+  parameter
+  value
+  severity: normal / warning / critical
+  timestamp
+  acknowledged false by default
+- Local alarm state should be retained in NVS.
+
+MQTT Topics:
+Use clean topic structure:
+fireguard/{siteId}/{gatewayId}/telemetry
+fireguard/{siteId}/{gatewayId}/status
+fireguard/{siteId}/{gatewayId}/alarm
+fireguard/{siteId}/{gatewayId}/config/get
+fireguard/{siteId}/{gatewayId}/config/set
+fireguard/{siteId}/{gatewayId}/ota
+fireguard/{siteId}/{gatewayId}/command
+
+JSON Telemetry Example:
+{
+  "pid": "FIREGUARD-S3-01",
+  "gatewayId": "JNX-FG-ABCD",
+  "siteId": "SITE001",
+  "timestamp": 1720000000,
+  "system": {
+    "wifi": "online",
+    "mqtt": "connected",
+    "cloud": "online",
+    "rs485": "ok",
+    "rssi": -61,
+    "uptime": 123456,
+    "fw": "1.0.0",
+    "releaseDate": "2026-07-02"
+  },
+  "devices": {
+    "jockeyPump": {"status": "ON", "online": true},
+    "mainPump1": {"status": "ON", "online": true},
+    "mainPump2": {"status": "OFF", "online": true},
+    "dieselPump": {"status": "ON", "online": true},
+    "sprinklerPressure": {"value": 6.5, "unit": "bar"},
+    "hydrantPressure": {"value": 5.8, "unit": "bar"},
+    "waterTankLevel": {"value": 65, "unit": "%"},
+    "dgFuelLevel": {"value": 72, "unit": "%"},
+    "dgBattery": {"value": 12.6, "unit": "V"},
+    "fireAlarmPanel": {"status": "NORMAL"},
+    "paSystem": {"status": "NORMAL"},
+    "ventilation": {"status": "ON"}
+  }
+}
+
+Code Quality:
+- Use PlatformIO.
+- Use Arduino framework or ESP-IDF if better.
+- Modular folder structure.
+- No single file coding.
+- Separate modules:
+  src/main.cpp
+  src/config/
+  src/modbus/
+  src/mqtt/
+  src/http/
+  src/webui/
+  src/ota/
+  src/storage/
+  src/alarms/
+  src/utils/
+- Each file should be small and readable.
+- Add comments only where needed.
+- Add serial logs for debugging.
+- Avoid blocking delay.
+- Use millis based scheduler.
+- Must compile successfully.
+- Add README.md with wiring, configuration, MQTT topics, and test procedure.
+
+Deliver first working MVP:
+1. WiFi provisioning
+2. RS485 Modbus read demo
+3. MQTT telemetry publish
+4. Local web UI
+5. OTA placeholder
+6. Alarm engine basic
+7. Config saved in NVS

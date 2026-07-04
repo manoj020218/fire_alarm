@@ -1,0 +1,263 @@
+You are developing JENIX FireGuard – Smart Fire Fighting System Monitoring software.
+
+Use existing JENIX IoT infra style:
+Frontend: React + TypeScript
+Backend: Node.js + Express
+Database: MongoDB
+Mobile APK: Capacitor
+Package manager: PNPM
+
+Important:
+Client approved the FireGuard dashboard layout image. Use same icon style, same dashboard screen concept, same APK/mobile screen concept.
+
+Reference image:
+Use this image as visual reference:
+a_clean_infographic_dashboard_mockup_image_showing.png
+
+Main rule:
+Each frontend component file must be maximum 200 lines for easy debugging.
+Each backend controller/service file should also be kept small and modular.
+
+Product:
+FireGuard by JENIX
+PID: FIREGUARD-S3-01
+
+Purpose:
+Cloud dashboard and mobile app for RS485 based fire fighting system monitoring.
+
+Architecture:
+ESP32-S3 FireGuard Gateway -> MQTT/HTTP -> Node backend -> MongoDB -> React PWA + Capacitor APK.
+
+Dashboard Pages:
+1. Login
+2. Site / Building selector
+3. Dashboard
+4. Live Monitor
+5. Alarms
+6. Reports
+7. Trends
+8. Devices
+9. Maintenance
+10. Users
+11. Settings
+12. API Integration
+
+Dashboard Layout:
+Use approved design:
+- Left sidebar dark blue
+- FireGuard logo top
+- Pages with icons
+- Top bar with site selector, date/time, notification bell, user
+- Status cards:
+  System Status
+  Devices Online
+  Active Alarms
+  Acknowledged
+  Unacknowledged
+- Main fire pump room overview with icon-based equipment diagram:
+  Sprinkler Line
+  Hydrant Line
+  Jockey Pump
+  Main Pump 1
+  Main Pump 2
+  Diesel Pump
+  DG Fuel Level
+  DG Battery
+  Water Tank Level
+  Fire Alarm Panel
+  PA System
+  Ventilation System
+- Right side status panel:
+  Device Status
+  Communication Status
+  Quick Actions
+- Bottom alarm table.
+
+Mobile APK Screens:
+Use same approved mobile screen concept:
+1. Dashboard summary
+2. Pump room view
+3. Live data
+4. Alarms
+5. Trends
+6. Reports
+
+Use responsive design:
+- Desktop dashboard for large screens
+- Mobile app view for Capacitor APK
+- PWA install support
+
+Icons:
+Use React Icons.
+Use same type of equipment icons as approved image.
+If exact image icons not available, create clean SVG/Icon components:
+- PumpIcon
+- PressureIcon
+- TankIcon
+- BatteryIcon
+- FuelIcon
+- FirePanelIcon
+- PASystemIcon
+- VentilationIcon
+- ValveIcon
+- GatewayIcon
+- CloudIcon
+
+Do not use copied third-party proprietary icons.
+
+Data Model:
+MongoDB collections:
+1. users
+2. sites
+3. gateways
+4. devices
+5. telemetry
+6. alarms
+7. reports
+8. auditLogs
+9. maintenanceLogs
+10. deviceConfigs
+
+Roles:
+1. JENIX_SUPER_ADMIN
+2. VENDOR_ADMIN
+3. CLIENT_ADMIN
+4. MAINTENANCE_USER
+5. VIEWER
+
+Core Features:
+- Multi-site dashboard
+- Real-time telemetry using Socket.IO
+- MQTT ingestion service
+- HTTP fallback ingestion API
+- Alarm generation
+- Alarm acknowledge with user/time/reason
+- Alarm history
+- Device online/offline
+- RS485 device mapping page
+- Register mapping UI
+- Reports PDF/Excel/CSV
+- Trend charts
+- User management
+- Audit logs
+- API token for third-party integration
+- Push notification placeholder for FCM
+- WhatsApp/SMS/Email alert placeholder
+
+Live Parameters:
+- Jockey Pump status
+- Main Pump 1 status
+- Main Pump 2 status
+- Diesel Pump status
+- Sprinkler pressure
+- Hydrant pressure
+- Water tank level
+- Diesel fuel level
+- DG battery voltage
+- Fire alarm panel status
+- PA system status
+- Ventilation system status
+- Valve status
+- Gateway online/offline
+- MQTT connected/disconnected
+- Cloud online/offline
+- API status
+
+Backend API:
+Create REST API:
+POST /api/ingest/telemetry
+POST /api/ingest/alarm
+GET /api/sites
+GET /api/sites/:siteId/dashboard
+GET /api/sites/:siteId/devices
+GET /api/sites/:siteId/alarms
+POST /api/alarms/:alarmId/ack
+GET /api/sites/:siteId/trends
+GET /api/sites/:siteId/reports
+POST /api/reports/generate
+GET /api/gateways/:gatewayId/config
+PUT /api/gateways/:gatewayId/config
+
+MQTT Topics:
+fireguard/{siteId}/{gatewayId}/telemetry
+fireguard/{siteId}/{gatewayId}/status
+fireguard/{siteId}/{gatewayId}/alarm
+fireguard/{siteId}/{gatewayId}/config/get
+fireguard/{siteId}/{gatewayId}/config/set
+fireguard/{siteId}/{gatewayId}/command
+
+Frontend Folder Structure:
+src/
+  app/
+  components/
+    layout/
+    cards/
+    icons/
+    charts/
+    tables/
+    status/
+  pages/
+    Dashboard/
+    LiveMonitor/
+    Alarms/
+    Reports/
+    Trends/
+    Devices/
+    Maintenance/
+    Users/
+    Settings/
+  services/
+    api.ts
+    socket.ts
+    auth.ts
+  types/
+  utils/
+  hooks/
+
+Backend Folder Structure:
+server/
+  src/
+    app.ts
+    routes/
+    controllers/
+    services/
+    models/
+    mqtt/
+    socket/
+    middleware/
+    utils/
+    config/
+
+UI Style:
+- Professional industrial look
+- White background
+- Navy blue sidebar
+- Red fire alert color
+- Green OK status
+- Orange warning
+- Responsive cards
+- Clean typography
+- Same layout as approved reference
+- JENIX branding
+- FireGuard branding
+
+Testing:
+- Add sample seed data for ABC Towers, Mumbai.
+- Add fake telemetry simulator.
+- Dashboard should work without real hardware.
+- Add README with setup steps.
+- Add .env.example.
+- Run pnpm install, pnpm dev instructions.
+- Make sure app builds without TypeScript errors.
+
+First MVP Deliverables:
+1. Full desktop dashboard matching approved layout.
+2. Mobile dashboard matching approved APK screens.
+3. Backend APIs with mock data.
+4. MongoDB models.
+5. MQTT ingestion service.
+6. Socket.IO live updates.
+7. Alarm acknowledge flow.
+8. Device/register mapping page.
+9. Capacitor Android setup.
+10. Component files max 200 lines.

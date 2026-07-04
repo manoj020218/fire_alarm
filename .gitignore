@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Build outputs
+frontend/dist/
+backend/dist/
+
+# Environment files
+.env
+.env.local
+.env.production
+frontend/.env.local
+backend/.env.local
+
+# Coverage
+frontend/coverage/
+backend/coverage/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# PWA generated
+frontend/public/sw.js
+frontend/public/workbox-*.js
+
+# Screenshots (optional - comment out if you want to track)
+# screenshots/
+
+# Playwright
+playwright-report/
+test-results/
