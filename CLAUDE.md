@@ -666,7 +666,7 @@ pnpm seed          # run seed script
 ## 11. SESSION LOG
 
 ### Session 3 — 2026-07-05
-**Focus:** Git init, GitHub push, dashboard screenshots  
+**Focus:** Git init, GitHub push, dashboard screenshots, project status file  
 **Completed:**
 - [x] Initialized git repository in project root
 - [x] Created `.gitignore` (node_modules, dist, .env, coverage, playwright artifacts)
@@ -680,15 +680,21 @@ pnpm seed          # run seed script
   - `screenshots/live-monitor.png` — Live Monitor (14 equipment cards, gateway communication status)
   - `screenshots/trends.png` — Trends (Recharts 24h history, warn/crit threshold lines)
   - `screenshots/devices.png` — Devices (RS485 register map with hex addresses, FC codes)
+- [x] Created STATUS.md — project status + hardware change documentation
 
 **GitHub repo:** https://github.com/manoj020218/fire_alarm  
 **Screenshots:** D:\IOT Device\fireguard\fireguard v1\screenshots\  
 
+**PROJECT ON HOLD — Hardware Change:**  
+Customer has specified a custom gateway: ESP32 + 4G LTE module + LAN port +
+RS485 + RS232 + 4× Digital Input + 2× Digital Output. Project resumes when
+hardware arrives. See STATUS.md for full details and resume checklist.
+
 **Next session must start with:**
 1. Run `pnpm test` in `frontend/` to confirm tests still pass
-2. Write remaining Phase 1 integration tests (LoginPage, DashboardPage, AlarmsPage)
-3. Present screenshots to client for dashboard layout approval
-4. After approval → start Phase 2 backend (Express + MongoDB + MQTT + Socket.IO)
+2. Present dashboard screenshots to client for layout approval
+3. Update Phase 5 firmware plan in CLAUDE.md for new hardware interfaces
+4. Start Phase 2 backend (Express + MongoDB + MQTT + Socket.IO)
 
 ---
 
