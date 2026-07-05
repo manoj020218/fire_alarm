@@ -665,6 +665,33 @@ pnpm seed          # run seed script
 
 ## 11. SESSION LOG
 
+### Session 3 — 2026-07-05
+**Focus:** Git init, GitHub push, dashboard screenshots  
+**Completed:**
+- [x] Initialized git repository in project root
+- [x] Created `.gitignore` (node_modules, dist, .env, coverage, playwright artifacts)
+- [x] Created `.gitattributes` (LF line endings, binary PNG handling)
+- [x] Initial commit: 78 files, all Phase 1 source code
+- [x] Pushed to GitHub: https://github.com/manoj020218/fire_alarm (branch: master)
+- [x] Captured full-page screenshots of all dashboard pages using Playwright + local Chrome:
+  - `screenshots/login.png` — Login page (navy left + white right split layout)
+  - `screenshots/dashboard.png` — Dashboard (summary bar, pump room map, gateway panel, recent alarms)
+  - `screenshots/alarms.png` — Alarms page (severity badges, ACK buttons, filter tabs)
+  - `screenshots/live-monitor.png` — Live Monitor (14 equipment cards, gateway communication status)
+  - `screenshots/trends.png` — Trends (Recharts 24h history, warn/crit threshold lines)
+  - `screenshots/devices.png` — Devices (RS485 register map with hex addresses, FC codes)
+
+**GitHub repo:** https://github.com/manoj020218/fire_alarm  
+**Screenshots:** D:\IOT Device\fireguard\fireguard v1\screenshots\  
+
+**Next session must start with:**
+1. Run `pnpm test` in `frontend/` to confirm tests still pass
+2. Write remaining Phase 1 integration tests (LoginPage, DashboardPage, AlarmsPage)
+3. Present screenshots to client for dashboard layout approval
+4. After approval → start Phase 2 backend (Express + MongoDB + MQTT + Socket.IO)
+
+---
+
 ### Session 2 — 2026-07-04
 **Focus:** Phase 1 — Full PWA frontend build  
 **Completed (Phase 1 tasks):**

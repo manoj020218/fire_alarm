@@ -1,9 +1,13 @@
-import { chromium } from 'playwright';
+import pkg from 'file:///C:/Users/User/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/node_modules/playwright/index.js';
+const { chromium } = pkg;
 
-const SS_DIR = new URL('.', import.meta.url).pathname.replace(/^\//, '');
+const SS_DIR = 'D:/IOT Device/fireguard/fireguard v1/screenshots/';
 const BASE = 'http://localhost:5173';
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+});
 const page = await browser.newPage();
 await page.setViewportSize({ width: 1440, height: 900 });
 
