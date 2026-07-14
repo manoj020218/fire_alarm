@@ -1,0 +1,12 @@
+# PlatformIO build output
+.pio/
+
+# Real credentials — NEVER commit
+src/config/secrets.h
+
+# IDE
+.vscode/
+*.code-workspace
+
+# macOS
+.DS_Store

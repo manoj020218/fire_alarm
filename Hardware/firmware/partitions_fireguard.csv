@@ -1,0 +1,10 @@
+# FireGuard custom partition table — 4 MB flash
+# Two ~1.6 MB OTA slots + NVS + otadata + coredump
+# No SPIFFS: web assets embedded in PROGMEM (gzipped)
+#
+# Name,   Type, SubType, Offset,   Size,     Flags
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xe000,   0x2000,
+ota_0,    app,  ota_0,   0x10000,  0x1A0000,
+ota_1,    app,  ota_1,   0x1B0000, 0x1A0000,
+coredump, data, coredump,0x350000, 0x10000,
