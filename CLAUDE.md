@@ -16,9 +16,16 @@
 **Horizon:** 10-year production system — code quality must match that lifespan  
 
 ### Hardware Stack
-- ESP32-S3 N16R8 as RS485 Modbus RTU Master (MAX485 chip)
-- 14 RS485 field devices (pumps, sensors, panels)
-- MQTT primary / HTTP fallback communication
+> **HARDWARE CHANGED 2026-07 — see `Hardware/VAJRUINO_FIRMWARE_PLAN.md` (authoritative for Phase 5).**
+> The original ESP32-S3 N16R8 target is obsolete. Delivered board is the **Vajravegha Vajruino
+> VVM401** industrial gateway built on a **plain ESP32** (dual-core 240 MHz, 4 MB flash, 520 kB RAM,
+> **no PSRAM**). The old PID `FIREGUARD-S3-01` is retained for cloud compatibility but the "S3" is a
+> misnomer — the MCU is ESP32 classic.
+- **Vajruino VVM401** gateway: ESP32 classic + SIMCOM A7672S 4G LTE + W5500 Ethernet + WiFi/BLE
+- RS485 Modbus RTU master to 14 field devices (RS485-only; RS232 shares the same UART and is unused)
+- 4× opto-isolated digital inputs (active-low), 2× 3.3 V logic outputs (indication only, ext. relay)
+- SD card (offline buffer + logs), DS3231 RTC + 32k EEPROM (offline timestamps)
+- Uplink failover: **4G > LAN > WiFi**; MQTT primary / HTTP fallback communication
 
 ### Software Stack
 | Layer | Technology |
@@ -302,16 +309,20 @@ No backend required at this stage. All data from `mockTelemetry.ts`.
 - [ ] 4.4 APK build + signing
 - [ ] 4.5 6 mobile screen flows tested
 
-### PHASE 5 — Hardware Firmware
-- [ ] 5.1 PlatformIO project scaffold
-- [ ] 5.2 WiFi provisioning (BLE + AP)
-- [ ] 5.3 RS485 Modbus RTU master module
-- [ ] 5.4 MQTT telemetry publish
-- [ ] 5.5 Alarm engine
-- [ ] 5.6 Local web UI
-- [ ] 5.7 NVS config storage
-- [ ] 5.8 OTA placeholder
-- [ ] 5.9 Watchdog + millis scheduler
+### PHASE 5 — Hardware Firmware (Vajruino VVM401)
+> Full step-by-step in `Hardware/VAJRUINO_FIRMWARE_PLAN.md`. Target: PlatformIO, `board = esp32dev`
+> (classic). Provisioning is **AP-web only (no BLE)**; outputs are **indication-only**; **RS485-only**.
+- [ ] 5.1 (FW-1) Skeleton + peripherals bring-up (RTC, SD, EEPROM, DI active-low, DO, LED, scheduler)
+- [ ] 5.2 (FW-2) Uplink failover manager — 4G (A7672/TinyGSM) > LAN (W5500) > WiFi (STA+AP portal)
+- [ ] 5.3 (FW-3) MQTT over the active uplink (single reused client; raise PubSubClient packet size)
+- [ ] 5.4 (FW-4) RS485 Modbus RTU master — config-driven register map, timeout/CRC counters
+- [ ] 5.5 (FW-5) Alarm engine — thresholds, dedup, NVS-retained state, immediate publish
+- [ ] 5.6 (FW-6) Offline buffer on SD + RTC time sync (queue when uplinks down, replay on reconnect)
+- [ ] 5.7 (FW-7) Local web UI (status/scan/test/register-map/config) + OTA (ElegantOTA) + AP provisioning
+- [ ] 5.8 (FW-8) Hardening — watchdog, auto-reboot schedule, full health JSON, README
+
+**Verify on delivery:** RS485 DE/RE pin presence + jumper set to RS485; baseline the unit by flashing
+the vendor `LTE_WiFi_Eth_MQTT.ino` before writing FireGuard firmware.
 
 ---
 
@@ -664,6 +675,21 @@ pnpm seed          # run seed script
 ---
 
 ## 11. SESSION LOG
+
+### Session 4 — 2026-07-13
+**Focus:** New hardware analysis (Vajruino VVM401) + firmware plan
+**Completed:**
+- [x] Read the delivered hardware pack: `Hardware/vajruino-master.zip` (vendor examples +
+  datasheets) and `Hardware/Vajruino.pdf`. Vendor `Examples/*.ino` are the authoritative pinout.
+- [x] Identified the board is **ESP32 classic** (4 MB flash / 520 kB RAM / no PSRAM), NOT ESP32-S3
+  — the old "S3" spec is obsolete. Extracted the full confirmed pin map + library stack.
+- [x] Locked 3 owner decisions: **RS485-only** (no RS232 — shared UART), **indication-only** digital
+  outputs (never actuate fire equipment), **AP-web provisioning only** (no BLE).
+- [x] Wrote `Hardware/VAJRUINO_FIRMWARE_PLAN.md` — authoritative Phase 5 plan (8 build steps FW-1..8,
+  module structure, test approach, classic-ESP32 risk list). No code yet.
+- [x] Updated CLAUDE.md (Hardware Stack + Phase 5) and STATUS.md for the new hardware.
+**Next session must start with:** when the board arrives — baseline via vendor
+`LTE_WiFi_Eth_MQTT.ino`, check for RS485 DE/RE pin, then FW-1. Backend/PWA/APK unchanged.
 
 ### Session 3 — 2026-07-05
 **Focus:** Git init, GitHub push, dashboard screenshots, project status file  
