@@ -188,8 +188,14 @@ static void publish_telemetry() {
     if (mqtt_connected()) {
         mqtt_publish(topic_telemetry().c_str(), buf);
     } else {
+        // FIX 4: throttle "SD buffer write failed" log — at most once per 60 s
+        static uint32_t s_sdFailLogMs = 0;
         if (!sdbuf_write(buf)) {
-            LOG_W("MAIN", "SD buffer write failed — record lost");
+            uint32_t now = millis();
+            if (s_sdFailLogMs == 0 || (now - s_sdFailLogMs) >= 60000UL) {
+                LOG_W("MAIN", "SD buffer write failed — record lost");
+                s_sdFailLogMs = now;
+            }
         }
         mqtt_http_fallback_telemetry(buf);
     }

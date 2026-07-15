@@ -73,8 +73,15 @@ button.danger{background:#dc2626;color:#fff}
 </div>
 <div id="toast"></div>
 <script>
-var _tok='',_tab='status',_si=null;
+var _tok='',_tab='status',_si=null,_pwRequired=true;
 
+// FIX 3: Query server on load; if no admin password is set, auto-unlock
+function initAuth(){
+  fetch('/api/authinfo').then(function(r){return r.json();}).then(function(d){
+    _pwRequired=!!d.passwordSet;
+    if(!_pwRequired){_tok='__open__';document.getElementById('loginBanner').style.display='none';}
+  }).catch(function(){/* server unreachable — keep banner */});
+}
 function login(){var p=document.getElementById('pwInput');if(p.value){_tok=p.value;document.getElementById('loginBanner').style.display='none';toast('Unlocked','ok');}}
 function checkAuth(){if(!_tok){document.getElementById('loginBanner').style.display='flex';return false;}return true;}
 function toast(msg,cls){var t=document.getElementById('toast');t.textContent=msg;t.style.color=cls==='ok'?'#22c55e':cls==='warn'?'#f59e0b':'#ef4444';t.style.display='block';setTimeout(function(){t.style.display='none';},3500);}
@@ -237,7 +244,7 @@ function otaUpdate(){
 }
 
 // ---- Boot ----
-loadStatus();loadModbus();
+initAuth();loadStatus();loadModbus();
 _si=setInterval(function(){if(_tab==='status')loadStatus();if(_tab==='alarms')loadAlarms();},10000);
 </script>
 </body></html>

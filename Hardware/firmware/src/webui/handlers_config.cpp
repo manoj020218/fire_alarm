@@ -1,11 +1,15 @@
 // ============================================================
 // FireGuard WebUI — Config / provisioning handlers
-// POST /api/config       — save NVS, reboot
+// POST /api/config       — save NVS, deferred reboot
 // GET  /api/config       — return config (no secret echo)
 // GET  /api/config/export — full JSON export
 // POST /api/config/import — replace config from JSON
-// POST /api/factory-reset — clear NVS, reboot
+// POST /api/factory-reset — clear NVS, deferred reboot
+// GET  /api/authinfo      — {"passwordSet": bool} for login gate
 // Auth: X-Admin-Token header required for all mutating ops.
+//
+// FIX 2: Response is sent FIRST; esp_restart() is deferred ~1.5 s
+// via a flag read in webui_loop() so the browser sees "Saved".
 // ============================================================
 #include "handlers_config.h"
 #include "auth.h"
@@ -19,8 +23,37 @@
 
 #define check_admin_token(req) webui_check_admin(req)
 
+// ---- Deferred reboot state ----------------------------------
+static bool     s_rebootPending = false;
+static uint32_t s_rebootAt      = 0;   // millis() target
+
+void webui_config_schedule_reboot(uint32_t delayMs) {
+    s_rebootPending = true;
+    s_rebootAt      = millis() + delayMs;
+}
+
+void webui_config_reboot_tick() {
+    if (s_rebootPending && (int32_t)(millis() - s_rebootAt) >= 0) {
+        s_rebootPending = false;
+        LOG_W("WEBUI", "Executing deferred reboot");
+        esp_restart();
+    }
+}
+
+// ---- helpers -------------------------------------------------
 static void deny(AsyncWebServerRequest* req) {
     req->send(401, "application/json", "{\"error\":\"unauthorized\"}");
+}
+
+// ---- GET /api/authinfo (open — used by UI login gate) -------
+
+static void handle_authinfo(AsyncWebServerRequest* req) {
+    Preferences p;
+    p.begin("fg_adm", true);
+    bool pwSet = (p.getString("pass", "").length() > 0);
+    p.end();
+    String body = pwSet ? "{\"passwordSet\":true}" : "{\"passwordSet\":false}";
+    req->send(200, "application/json", body);
 }
 
 // ---- GET /api/config ----------------------------------------
@@ -105,10 +138,11 @@ static void handle_post_config(AsyncWebServerRequest* req, uint8_t* data,
     }
 
     config_save();
-    req->send(200, "application/json", "{\"ok\":true}");
-    LOG_I("WEBUI", "Config saved via WebUI — rebooting");
-    delay(300);
-    esp_restart();
+
+    // FIX 2: Send response FIRST, then schedule deferred reboot
+    req->send(200, "application/json", "{\"ok\":true,\"rebooting\":true}");
+    LOG_I("WEBUI", "Config saved via WebUI — reboot in 1.5 s");
+    webui_config_schedule_reboot(1500);
 }
 
 // ---- GET /api/config/export ---------------------------------
@@ -172,7 +206,6 @@ static void handle_import(AsyncWebServerRequest* req, uint8_t* data,
     }
 
     GatewayConfig& cfg = getConfig();
-    // Import basic fields if present
     if (doc.containsKey("env"))      strlcpy(cfg.env,       doc["env"],      sizeof(cfg.env));
     if (doc.containsKey("siteId"))   strlcpy(cfg.siteId,    doc["siteId"],   sizeof(cfg.siteId));
     if (doc.containsKey("gatewayId"))strlcpy(cfg.gatewayId, doc["gatewayId"],sizeof(cfg.gatewayId));
@@ -180,7 +213,6 @@ static void handle_import(AsyncWebServerRequest* req, uint8_t* data,
     if (doc.containsKey("mqttPort")) cfg.mqttPort = doc["mqttPort"].as<uint16_t>();
     if (doc.containsKey("apiHost"))  strlcpy(cfg.apiHost,   doc["apiHost"],  sizeof(cfg.apiHost));
 
-    // Import register map
     if (doc.containsKey("registers")) {
         JsonArray regs = doc["registers"].as<JsonArray>();
         uint8_t idx = 0;
@@ -199,7 +231,6 @@ static void handle_import(AsyncWebServerRequest* req, uint8_t* data,
         cfg.regCount = idx;
     }
 
-    // Import thresholds
     if (doc.containsKey("thresholds")) {
         JsonArray thr = doc["thresholds"].as<JsonArray>();
         uint8_t idx = 0;
@@ -225,19 +256,21 @@ static void handle_import(AsyncWebServerRequest* req, uint8_t* data,
 static void handle_factory_reset(AsyncWebServerRequest* req) {
     if (!check_admin_token(req)) { deny(req); return; }
     config_reset_to_defaults();
-    // Also clear WiFi + admin creds
     Preferences p;
     p.begin("fg_wifi", false); p.clear(); p.end();
     p.begin("fg_adm",  false); p.clear(); p.end();
-    req->send(200, "application/json", "{\"ok\":true}");
-    LOG_W("WEBUI", "Factory reset via WebUI — rebooting");
-    delay(300);
-    esp_restart();
+
+    // FIX 2: Send response FIRST, then schedule deferred reboot
+    req->send(200, "application/json", "{\"ok\":true,\"rebooting\":true}");
+    LOG_W("WEBUI", "Factory reset via WebUI — reboot in 1.5 s");
+    webui_config_schedule_reboot(1500);
 }
 
 // ---- Register all config routes -----------------------------
 
 void webui_register_config(AsyncWebServer* srv) {
+    srv->on("/api/authinfo", HTTP_GET, handle_authinfo);
+
     srv->on("/api/config", HTTP_GET, handle_get_config);
 
     srv->on("/api/config", HTTP_POST,

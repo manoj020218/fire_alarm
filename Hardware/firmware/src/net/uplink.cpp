@@ -1,5 +1,13 @@
 // ============================================================
 // FireGuard — Uplink failover manager implementation
+// Priority: 4G > LAN > WiFi
+//
+// NON-BLOCKING DESIGN
+// -------------------
+// Each transport exposes a step() / is_connected() pair.
+// uplink_loop() is called every main loop() iteration and
+// calls modem4g_step(), eth_step(), wifi_maintain() — all
+// return quickly.  No blocking waits anywhere in this file.
 // ============================================================
 #include "uplink.h"
 #include "modem4g.h"
@@ -13,54 +21,37 @@
 #include <WiFiClient.h>
 #include <Preferences.h>
 
-static UplinkType s_active = UplinkType::NONE;
-static Client*    s_client = nullptr;
-static Task       s_checkTask = {0, UPLINK_CHECK_INTERVAL_MS};
-static bool       s_4gInited  = false;
-static bool       s_ethInited = false;
-static bool       s_wifiInited= false;
+static UplinkType s_active     = UplinkType::NONE;
+static Client*    s_client     = nullptr;
+static Task       s_checkTask  = {0, UPLINK_CHECK_INTERVAL_MS};
+static bool       s_wifiInited = false;
 
 // Build the WiFi AP SSID from the gateway ID
 static String ap_ssid() {
     const char* gw = getConfig().gatewayId;
     if (strlen(gw) >= 4) {
-        return String(gw);  // already "JNX-FG-XXXX"
+        return String(gw);
     }
     return String(WIFI_AP_SSID_PREFIX) + "0000";
 }
 
-static UplinkType try_connect() {
+// ---- non-blocking probe — returns best available transport ---
+static UplinkType probe_transports() {
     GatewayConfig& cfg = getConfig();
 
-    // --- 4G (highest priority) ---
-    if (!s_4gInited) {
-        s_4gInited = modem4g_init(cfg.apn);
-    }
-    if (s_4gInited && modem4g_is_connected()) {
+    // --- 4G: advance state machine one step ---
+    modem4g_step(cfg.apn);
+    if (modem4g_is_connected()) {
         return UplinkType::G4;
     }
 
-    // --- LAN ---
-    if (!s_ethInited) {
-        s_ethInited = eth_init();
-    }
-    if (s_ethInited && eth_is_connected()) {
+    // --- LAN: advance state machine one step ---
+    eth_step();
+    if (eth_is_connected()) {
         return UplinkType::LAN;
     }
 
-    // --- WiFi STA (creds from NVS "fg_wifi" namespace) ---
-    if (!s_wifiInited) {
-        Preferences wprefs;
-        wprefs.begin("fg_wifi", true);
-        String wssid = wprefs.getString("ssid", "");
-        String wpass = wprefs.getString("pass", "");
-        wprefs.end();
-        s_wifiInited = wifi_begin(
-            wssid.c_str(),
-            wpass.c_str(),
-            ap_ssid().c_str()
-        );
-    }
+    // --- WiFi STA: just poll (WiFi.begin was called in uplink_init) ---
     if (wifi_sta_connected()) {
         return UplinkType::WIFI;
     }
@@ -69,18 +60,25 @@ static UplinkType try_connect() {
 }
 
 void uplink_init() {
-    // Kick off AP immediately so provisioning works even before 4G
+    // Start AP immediately so provisioning works even before 4G
     String ssid = ap_ssid();
-    wifi_begin("", "", ssid.c_str());
+    GatewayConfig& cfg = getConfig();
+
+    // Load WiFi STA creds and start (non-blocking)
+    Preferences wprefs;
+    wprefs.begin("fg_wifi", true);
+    String wssid = wprefs.getString("ssid", "");
+    String wpass = wprefs.getString("pass", "");
+    wprefs.end();
+    wifi_begin(wssid.c_str(), wpass.c_str(), ssid.c_str());
     s_wifiInited = true;
 
-    // Force immediate uplink check
+    // Force immediate uplink check on first loop
     task_trigger_now(s_checkTask);
-    uplink_loop();
 }
 
 void uplink_loop() {
-    // Periodic maintenance
+    // Periodic maintenance (non-blocking)
     modem4g_maintain();
     eth_maintain();
     wifi_maintain();
@@ -89,7 +87,7 @@ void uplink_loop() {
 
     UplinkType prev = s_active;
 
-    // Check current transport still alive
+    // Check if current transport is still alive
     bool currentAlive = false;
     switch (s_active) {
         case UplinkType::G4:   currentAlive = modem4g_is_connected(); break;
@@ -99,8 +97,8 @@ void uplink_loop() {
     }
 
     if (!currentAlive) {
-        // Re-probe in priority order
-        s_active = try_connect();
+        // Re-probe all transports (each step call is non-blocking)
+        s_active = probe_transports();
     }
 
     // Update client pointer

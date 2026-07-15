@@ -17,13 +17,17 @@
 #define TMP_FILE    "/fg_tmp.jsonl"
 
 static SPIClass s_hspi(HSPI);
-static bool     s_sdOk = false;
+static bool     s_sdOk       = false;
+// FIX 4: once mount fails (no card), disable all further SD attempts so we
+// don't log/work every telemetry cycle. Re-enabled only on reboot.
+static bool     s_sdDisabled = false;
 
 bool sdbuf_init() {
     s_hspi.begin(PIN_SD_CLK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
     if (!SD.begin(PIN_SD_CS, s_hspi, 4000000)) {
-        LOG_W("SD", "Mount failed (no card or wiring issue)");
-        s_sdOk = false;
+        LOG_W("SD", "Mount failed (no card or wiring issue) — buffering disabled");
+        s_sdOk       = false;
+        s_sdDisabled = true;   // suppress all future attempts until reboot
         return false;
     }
     s_sdOk = true;
@@ -32,7 +36,7 @@ bool sdbuf_init() {
 }
 
 bool sdbuf_write(const char* jsonLine) {
-    if (!s_sdOk) return false;
+    if (s_sdDisabled || !s_sdOk) return false;
 
     // Drop oldest if over limit
     if (sdbuf_pending_count() >= SD_BUFFER_MAX_RECORDS) {
@@ -65,12 +69,12 @@ bool sdbuf_write(const char* jsonLine) {
 }
 
 bool sdbuf_has_pending() {
-    if (!s_sdOk) return false;
+    if (s_sdDisabled || !s_sdOk) return false;
     return SD.exists(BUF_FILE) && sdbuf_pending_count() > 0;
 }
 
 bool sdbuf_replay_next(char* buf, size_t len) {
-    if (!s_sdOk || !sdbuf_has_pending()) return false;
+    if (s_sdDisabled || !s_sdOk || !sdbuf_has_pending()) return false;
 
     File src = SD.open(BUF_FILE, FILE_READ);
     if (!src) return false;
@@ -99,14 +103,14 @@ bool sdbuf_replay_next(char* buf, size_t len) {
 }
 
 void sdbuf_drop_all() {
-    if (s_sdOk && SD.exists(BUF_FILE)) {
+    if (!s_sdDisabled && s_sdOk && SD.exists(BUF_FILE)) {
         SD.remove(BUF_FILE);
         LOG_I("SD", "Buffer cleared");
     }
 }
 
 uint32_t sdbuf_pending_count() {
-    if (!s_sdOk || !SD.exists(BUF_FILE)) return 0;
+    if (s_sdDisabled || !s_sdOk || !SD.exists(BUF_FILE)) return 0;
     File f = SD.open(BUF_FILE, FILE_READ);
     if (!f) return 0;
     uint32_t lines = 0;

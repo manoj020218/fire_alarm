@@ -16,6 +16,10 @@ static uint32_t     s_timeouts  = 0;
 static uint32_t     s_crcErrors = 0;
 static bool         s_busOk     = false;
 
+// FIX 4: per-slot last-warn timestamp; throttle timeout log to once per 60 s per slot
+#define MB_WARN_THROTTLE_MS 60000UL
+static uint32_t s_lastWarnMs[CONFIG_MAX_REGISTERS] = {};
+
 // Readings array (static, bounded by CONFIG_MAX_REGISTERS)
 static RegReading s_readings[CONFIG_MAX_REGISTERS] = {};
 
@@ -90,6 +94,7 @@ void modbus_poll() {
         s_readings[s_pollIdx].value        = eng;
         s_readings[s_pollIdx].online       = true;
         s_readings[s_pollIdx].lastUpdateMs = millis();
+        s_lastWarnMs[s_pollIdx]            = 0;  // reset throttle on success
 
         LOG_D("MB", "Poll[%d] tag=%s slave=%d raw=%lu val=%.2f %s",
               s_pollIdx, r.tag, r.slaveId, raw, eng, r.unit);
@@ -99,11 +104,23 @@ void modbus_poll() {
         if (isTimeout) {
             s_timeouts++;
             health_inc_modbus_timeout();
-            LOG_W("MB", "Timeout slave=%d reg=%d", r.slaveId, r.regAddr);
+            // FIX 4: throttle per-slot timeout log to once per 60 s
+            uint32_t now = millis();
+            if (s_lastWarnMs[s_pollIdx] == 0 ||
+                (now - s_lastWarnMs[s_pollIdx]) >= MB_WARN_THROTTLE_MS) {
+                LOG_W("MB", "Timeout slave=%d reg=%d (count=%lu)",
+                      r.slaveId, r.regAddr, s_timeouts);
+                s_lastWarnMs[s_pollIdx] = now;
+            }
         } else {
             s_crcErrors++;
             health_inc_modbus_crc();
-            LOG_W("MB", "CRC/err=%02X slave=%d reg=%d", result, r.slaveId, r.regAddr);
+            uint32_t now = millis();
+            if (s_lastWarnMs[s_pollIdx] == 0 ||
+                (now - s_lastWarnMs[s_pollIdx]) >= MB_WARN_THROTTLE_MS) {
+                LOG_W("MB", "CRC/err=%02X slave=%d reg=%d", result, r.slaveId, r.regAddr);
+                s_lastWarnMs[s_pollIdx] = now;
+            }
         }
         // Mark offline if no update for 3× timeout period
         if (millis() - s_readings[s_pollIdx].lastUpdateMs > (uint32_t)MODBUS_TIMEOUT_MS * 3) {

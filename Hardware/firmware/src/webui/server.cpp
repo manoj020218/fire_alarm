@@ -129,4 +129,6 @@ void webui_loop() {
     ElegantOTA.loop();
     // Drive OTA validation timeout watchdog
     ota_validation_tick();
+    // FIX 2: Execute deferred reboot after response was delivered
+    webui_config_reboot_tick();
 }
