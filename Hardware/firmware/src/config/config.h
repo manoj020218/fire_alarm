@@ -71,6 +71,10 @@ struct GatewayConfig {
     // WiFi STA (stored in fg_wifi NVS namespace to avoid config bloat)
     // wifiSsid / wifiPass live in NVS "fg_wifi" — not in this struct
 
+    // SMS alerting (Change 3)
+    char smsNumbers[64];  // comma-separated E.164 numbers, e.g. "+9172...,+9198..."
+    bool smsEnabled;      // master switch; default false
+
     // Hardening
     uint8_t  autoRebootHour;   // hour (0-23) for daily auto-reboot; 255 = disabled
     bool     otaAuto;          // auto-apply OTA when manifest has update

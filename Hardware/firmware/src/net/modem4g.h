@@ -31,6 +31,15 @@ int    modem4g_signal_dbm();
 String modem4g_operator();
 bool   modem4g_get_time(struct tm* out);
 
+// SMS alerting (Change 3).
+// Returns true if the modem is network-registered (not necessarily GPRS).
+// SMS works over circuit-switched network even when data uplink is WiFi/LAN.
+bool   modem4g_is_registered();
+
+// Send a single SMS.  Best-effort: returns false if modem not registered or send fails.
+// Brackets the blocking sendSMS() call with esp_task_wdt_reset().
+bool   modem4g_send_sms(const char* number, const char* text);
+
 // Access the underlying TinyGSM client (owned by uplink module)
 class Client;
 Client* modem4g_get_client();

@@ -132,6 +132,9 @@ function buildConfigForm(d){
   '<div><label>WiFi STA SSID</label><input id="cWifiS" value="'+h(d.wifiSsid||'')+'"></div></div>'+
   '<div class="row"><div><label>WiFi STA Pass</label><input id="cWifiP" type="password" placeholder="(unchanged)"></div>'+
   '<div><label>Admin Password</label><input id="cAdminPw" type="password" placeholder="(unchanged)"></div></div>'+
+  '<div class="row"><div><label>SMS Alert Numbers (comma-separated E.164)</label><input id="cSmsNums" value="'+h(d.smsNumbers||'')+'" placeholder="+91XXXXXXXXXX,+91XXXXXXXXXX"></div>'+
+  '<div style="display:flex;flex-direction:column;gap:.35rem"><label>SMS Enabled<input id="cSmsEn" type="checkbox"'+(d.smsEnabled?' checked':'')+' style="width:auto;margin-left:.4rem"></label>'+
+  '<button class="act sec" style="margin-top:.35rem" onclick="testSms()">Send Test SMS</button></div></div>'+
   '<div style="margin-top:.75rem;display:flex;gap:.5rem">'+
   '<button class="act" onclick="saveConfig()">Save &amp; Reboot</button>'+
   '<button class="act sec" onclick="exportConfig()">Export JSON</button>'+
@@ -142,11 +145,15 @@ function buildConfigForm(d){
 }
 function saveConfig(){
   if(!checkAuth())return;
-  var body={env:document.getElementById('cEnv').value,siteId:document.getElementById('cSite').value,gatewayId:document.getElementById('cGw').value,apn:document.getElementById('cApn').value,mqttHost:document.getElementById('cMqttH').value,mqttPort:parseInt(document.getElementById('cMqttP').value),mqttUser:document.getElementById('cMqttU').value,apiHost:document.getElementById('cApiH').value,wifiSsid:document.getElementById('cWifiS').value};
+  var body={env:document.getElementById('cEnv').value,siteId:document.getElementById('cSite').value,gatewayId:document.getElementById('cGw').value,apn:document.getElementById('cApn').value,mqttHost:document.getElementById('cMqttH').value,mqttPort:parseInt(document.getElementById('cMqttP').value),mqttUser:document.getElementById('cMqttU').value,apiHost:document.getElementById('cApiH').value,wifiSsid:document.getElementById('cWifiS').value,smsNumbers:document.getElementById('cSmsNums').value,smsEnabled:document.getElementById('cSmsEn').checked};
   var p=document.getElementById('cMqttPw').value;if(p)body.mqttPass=p;
   var wp=document.getElementById('cWifiP').value;if(wp)body.wifiPass=wp;
   var ap=document.getElementById('cAdminPw').value;if(ap)body.adminPass=ap;
   fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Token':_tok},body:JSON.stringify(body)}).then(function(r){if(r.ok)toast('Saved — rebooting','ok');else r.text().then(function(t){toast('Error: '+t,'bad');});}).catch(function(e){toast('Error: '+e,'bad');});
+}
+function testSms(){
+  if(!checkAuth())return;
+  fetch('/api/sms/test',{method:'POST',headers:{'X-Admin-Token':_tok}}).then(function(r){return r.json();}).then(function(d){if(d.ok)toast('Test SMS sent','ok');else toast('SMS failed: '+(d.error||'unknown'),'bad');}).catch(function(e){toast('Error: '+e,'bad');});
 }
 function exportConfig(){
   fetch('/api/config/export').then(function(r){return r.json();}).then(function(d){

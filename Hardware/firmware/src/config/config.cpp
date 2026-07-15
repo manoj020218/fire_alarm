@@ -36,6 +36,9 @@ static void load_defaults() {
     s_cfg.otaCheckIntervalMs     = OTA_CHECK_INTERVAL_MS;
     s_cfg.autoRebootHour         = 255;   // disabled
     s_cfg.otaAuto                = false;
+    // SMS defaults (Change 3)
+    strlcpy(s_cfg.smsNumbers, SMS_NUMBERS_DEFAULT, sizeof(s_cfg.smsNumbers));
+    s_cfg.smsEnabled             = SMS_ENABLED_DEFAULT;
     s_cfg.regCount               = 0;
     s_cfg.thresholdCount         = 0;
 
@@ -92,6 +95,9 @@ void config_load() {
     INT_GET("otaMs",     s_cfg.otaCheckIntervalMs,    OTA_CHECK_INTERVAL_MS);
     s_cfg.autoRebootHour = s_prefs.getUChar("autoRbtH", 255);
     s_cfg.otaAuto        = s_prefs.getBool("otaAuto",  false);
+    // SMS (Change 3)
+    STR_GET("smsNums",   s_cfg.smsNumbers, SMS_NUMBERS_DEFAULT);
+    s_cfg.smsEnabled = s_prefs.getBool("smsEn", SMS_ENABLED_DEFAULT);
 
     s_prefs.end();
 
@@ -120,6 +126,9 @@ void config_save() {
     s_prefs.putUInt  ("otaMs",     s_cfg.otaCheckIntervalMs);
     s_prefs.putUChar ("autoRbtH",  s_cfg.autoRebootHour);
     s_prefs.putBool  ("otaAuto",   s_cfg.otaAuto);
+    // SMS (Change 3)
+    s_prefs.putString("smsNums",   s_cfg.smsNumbers);
+    s_prefs.putBool  ("smsEn",     s_cfg.smsEnabled);
     s_prefs.end();
     LOG_I("CFG", "Saved to NVS");
 }

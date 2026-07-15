@@ -26,7 +26,8 @@ enum class EthState : uint8_t {
     RESETTING,      // hardware reset pulse
     DHCP_TRY,       // one short DHCP attempt
     CONNECTED,
-    FAILED          // back-off
+    FAILED,         // DHCP back-off (hardware present, no lease)
+    NOHW_BACKOFF    // long back-off when W5500 chip absent
 };
 
 static EthState  s_ethState   = EthState::UNINIT;
@@ -34,11 +35,12 @@ static uint32_t  s_stateTs    = 0;
 static bool      s_hwPresent  = false;
 static bool      s_rstReleased = false;  // tracks RST pin release within RESETTING state
 
-#define ETH_RST_LOW_MS      50
-#define ETH_RST_HIGH_MS     100
-#define ETH_DHCP_TIMEOUT_MS 4000   // short attempt; retry next tick if failed
-#define ETH_DHCP_RESP_MS    1000
-#define ETH_FAILED_RETRY_MS 15000  // back-off before DHCP retry
+#define ETH_RST_LOW_MS        50
+#define ETH_RST_HIGH_MS       100
+#define ETH_DHCP_TIMEOUT_MS   4000    // short attempt; retry next tick if failed
+#define ETH_DHCP_RESP_MS      1000
+#define ETH_FAILED_RETRY_MS   15000   // DHCP back-off (hw present, no lease)
+#define ETH_NOHW_RETRY_MS     300000  // 5-minute back-off when no W5500 fitted
 
 static void eth_enter(EthState ns) {
     s_ethState    = ns;
@@ -90,8 +92,9 @@ bool eth_step() {
         // Fast hardware-present check; fails in <1 ms if no W5500
         if (!s_hwPresent) {
             if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-                LOG_W("ETH", "No W5500 hardware detected");
-                eth_enter(EthState::FAILED);
+                // Chip absent — use long backoff; log once on entry
+                LOG_W("ETH", "No W5500 — Ethernet disabled, retry in 5min");
+                eth_enter(EthState::NOHW_BACKOFF);
                 break;
             }
             s_hwPresent = true;
@@ -114,14 +117,25 @@ bool eth_step() {
         break;
 
     case EthState::FAILED:
+        // Hardware is present but DHCP failed — retry on short interval
         if (eth_elapsed() > ETH_FAILED_RETRY_MS) {
             LOG_I("ETH", "Retrying DHCP");
-            s_hwPresent = false;  // re-check hardware
+            s_hwPresent = false;  // re-check hardware presence each retry
+            eth_enter(EthState::DHCP_TRY);
+        }
+        break;
+
+    case EthState::NOHW_BACKOFF:
+        // W5500 chip absent; wait 5 min then re-check in case hardware appears
+        // No log spam — message was printed once on entry to this state
+        if (eth_elapsed() > ETH_NOHW_RETRY_MS) {
+            s_hwPresent = false;
             eth_enter(EthState::DHCP_TRY);
         }
         break;
     }
 
+    // NOHW_BACKOFF / FAILED / other non-CONNECTED states always return false
     return s_ethState == EthState::CONNECTED;
 }
 

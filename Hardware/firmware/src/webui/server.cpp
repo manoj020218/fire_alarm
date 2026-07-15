@@ -8,6 +8,7 @@
 #include "handlers_config.h"
 #include "handlers_modbus.h"
 #include "handlers_ota.h"
+#include "handlers_sms.h"
 #include "../ota/ota.h"
 #include "../net/uplink.h"
 #include "../config/config.h"
@@ -112,6 +113,9 @@ void webui_init() {
 
     // OTA REST routes
     webui_register_ota(&s_server);
+
+    // SMS test route (Change 3)
+    webui_register_sms(&s_server);
 
     // ElegantOTA local .bin upload at /update
     ota_attach_elegant(&s_server);

@@ -60,22 +60,25 @@ static void handle_authinfo(AsyncWebServerRequest* req) {
 
 static void handle_get_config(AsyncWebServerRequest* req) {
     GatewayConfig& cfg = getConfig();
-    StaticJsonDocument<640> doc;
-    doc["env"]      = cfg.env;
-    doc["siteId"]   = cfg.siteId;
-    doc["gatewayId"]= cfg.gatewayId;
-    doc["mqttHost"] = cfg.mqttHost;
-    doc["mqttPort"] = cfg.mqttPort;
-    doc["mqttUser"] = cfg.mqttUser;
+    StaticJsonDocument<768> doc;
+    doc["env"]        = cfg.env;
+    doc["siteId"]     = cfg.siteId;
+    doc["gatewayId"]  = cfg.gatewayId;
+    doc["mqttHost"]   = cfg.mqttHost;
+    doc["mqttPort"]   = cfg.mqttPort;
+    doc["mqttUser"]   = cfg.mqttUser;
     // mqttPass intentionally omitted
-    doc["apiHost"]  = cfg.apiHost;
-    doc["apn"]      = cfg.apn;
-    doc["telMs"]    = cfg.telemetryIntervalMs;
-    doc["statusMs"] = cfg.statusIntervalMs;
-    doc["otaMs"]    = cfg.otaCheckIntervalMs;
-    doc["regCount"] = cfg.regCount;
-    doc["thrCount"] = cfg.thresholdCount;
-    doc["token"]    = api_get_token();
+    doc["apiHost"]    = cfg.apiHost;
+    doc["apn"]        = cfg.apn;
+    doc["telMs"]      = cfg.telemetryIntervalMs;
+    doc["statusMs"]   = cfg.statusIntervalMs;
+    doc["otaMs"]      = cfg.otaCheckIntervalMs;
+    doc["regCount"]   = cfg.regCount;
+    doc["thrCount"]   = cfg.thresholdCount;
+    doc["token"]      = api_get_token();
+    // SMS config (Change 3)
+    doc["smsNumbers"] = cfg.smsNumbers;
+    doc["smsEnabled"] = cfg.smsEnabled;
 
     // WiFi STA SSID (stored separately)
     Preferences wprefs;
@@ -83,7 +86,7 @@ static void handle_get_config(AsyncWebServerRequest* req) {
     doc["wifiSsid"] = wprefs.getString("ssid", "").c_str();
     wprefs.end();
 
-    char buf[640];
+    char buf[768];
     serializeJson(doc, buf, sizeof(buf));
     req->send(200, "application/json", buf);
 }
@@ -107,7 +110,12 @@ static void handle_post_config(AsyncWebServerRequest* req, uint8_t* data,
     if (doc.containsKey("mqttHost")) strlcpy(cfg.mqttHost, doc["mqttHost"], sizeof(cfg.mqttHost));
     if (doc.containsKey("mqttPort")) cfg.mqttPort = doc["mqttPort"].as<uint16_t>();
     if (doc.containsKey("mqttUser")) strlcpy(cfg.mqttUser, doc["mqttUser"], sizeof(cfg.mqttUser));
-    if (doc.containsKey("mqttPass")) strlcpy(cfg.mqttPass, doc["mqttPass"], sizeof(cfg.mqttPass));
+    // PASSWORD FIELDS: only update if the incoming string is NON-EMPTY.
+    // Empty/absent = keep existing value (honours the "(unchanged)" placeholder).
+    if (doc.containsKey("mqttPass")) {
+        const char* v = doc["mqttPass"].as<const char*>();
+        if (v && v[0] != '\0') strlcpy(cfg.mqttPass, v, sizeof(cfg.mqttPass));
+    }
     if (doc.containsKey("apiHost"))  strlcpy(cfg.apiHost,  doc["apiHost"],  sizeof(cfg.apiHost));
     if (doc.containsKey("apn"))      strlcpy(cfg.apn,      doc["apn"],      sizeof(cfg.apn));
     if (doc.containsKey("telMs"))    cfg.telemetryIntervalMs = doc["telMs"].as<uint32_t>();
@@ -120,8 +128,11 @@ static void handle_post_config(AsyncWebServerRequest* req, uint8_t* data,
         wprefs.begin("fg_wifi", false);
         if (doc.containsKey("wifiSsid"))
             wprefs.putString("ssid", doc["wifiSsid"].as<const char*>());
-        if (doc.containsKey("wifiPass"))
-            wprefs.putString("pass", doc["wifiPass"].as<const char*>());
+        if (doc.containsKey("wifiPass")) {
+            // PASSWORD FIELD: only write if non-empty
+            const char* wp = doc["wifiPass"].as<const char*>();
+            if (wp && wp[0] != '\0') wprefs.putString("pass", wp);
+        }
         wprefs.end();
     }
 
@@ -136,6 +147,12 @@ static void handle_post_config(AsyncWebServerRequest* req, uint8_t* data,
             LOG_I("WEBUI", "Admin password updated");
         }
     }
+
+    // SMS config (Change 3)
+    if (doc.containsKey("smsNumbers"))
+        strlcpy(cfg.smsNumbers, doc["smsNumbers"].as<const char*>(), sizeof(cfg.smsNumbers));
+    if (doc.containsKey("smsEnabled"))
+        cfg.smsEnabled = doc["smsEnabled"].as<bool>();
 
     config_save();
 

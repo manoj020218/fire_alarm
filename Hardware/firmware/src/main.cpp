@@ -19,6 +19,7 @@
 #include "util/health.h"
 #include "net/uplink.h"
 #include "net/apiclient.h"
+#include "net/modem4g.h"
 #include "mqttc/mqtt.h"
 #include "mqttc/topics.h"
 #include "modbus/registers.h"
@@ -112,6 +113,57 @@ static void check_auto_reboot() {
     s_lastHour = t.tm_hour;
 }
 
+// ---- SMS rate-limit (Change 3) ------------------------------
+// One entry per alarm tag; stores the millis() when an SMS was last sent.
+// Max slots = CONFIG_MAX_REGISTERS (same as alarm slot count).
+#define SMS_RATE_LIMIT_MS  600000UL   // 10 minutes between SMS per tag
+struct SmsRateEntry { char tag[24]; uint32_t lastMs; };
+static SmsRateEntry s_smsRate[CONFIG_MAX_REGISTERS] = {};
+static uint8_t      s_smsRateCount = 0;
+
+// Returns true if OK to send (and updates the timestamp); false if rate-limited.
+static bool sms_rate_ok(const char* tag) {
+    uint32_t now = millis();
+    for (uint8_t i = 0; i < s_smsRateCount; i++) {
+        if (strcmp(s_smsRate[i].tag, tag) == 0) {
+            if ((now - s_smsRate[i].lastMs) < SMS_RATE_LIMIT_MS) return false;
+            s_smsRate[i].lastMs = now;
+            return true;
+        }
+    }
+    if (s_smsRateCount < CONFIG_MAX_REGISTERS) {
+        strlcpy(s_smsRate[s_smsRateCount].tag, tag, 24);
+        s_smsRate[s_smsRateCount].lastMs = now;
+        s_smsRateCount++;
+    }
+    return true;
+}
+
+// Send SMS to every number in the comma-separated smsNumbers string.
+static void sms_dispatch(const AlarmEvent& ev) {
+    GatewayConfig& cfg = getConfig();
+    if (!cfg.smsEnabled || !cfg.smsNumbers[0]) return;
+    if (!sms_rate_ok(ev.tag)) {
+        LOG_I("MAIN", "SMS rate-limited for tag %s", ev.tag);
+        return;
+    }
+    // Build compact message (fits 160-char SMS)
+    char msg[128];
+    snprintf(msg, sizeof(msg), "FireGuard %s: CRITICAL %s=%.1f @%lu",
+             cfg.siteId, ev.parameter, ev.value, (unsigned long)ev.timestamp);
+
+    // Walk comma-separated numbers
+    char nums[64];
+    strlcpy(nums, cfg.smsNumbers, sizeof(nums));
+    char* tok = strtok(nums, ",");
+    while (tok) {
+        // Trim leading spaces
+        while (*tok == ' ') tok++;
+        if (*tok) modem4g_send_sms(tok, msg);
+        tok = strtok(nullptr, ",");
+    }
+}
+
 // ---- Alarm publish callback ---------------------------------
 static void on_alarm_event(const AlarmEvent& ev) {
     StaticJsonDocument<256> doc;
@@ -133,6 +185,13 @@ static void on_alarm_event(const AlarmEvent& ev) {
         char buf[256];
         serializeJson(doc, buf, sizeof(buf));
         mqtt_http_fallback_alarm(buf);
+    }
+
+    // SMS alerting (Change 3): only on newly-raised CRITICAL alarms
+    // ev.active==true means this is a raise, not a clear.
+    // sms_dispatch() is fully decoupled — if modem not registered it returns silently.
+    if (ev.active && ev.severity == AlarmSeverity::CRITICAL) {
+        sms_dispatch(ev);
     }
 }
 

@@ -60,6 +60,10 @@
 #define THRESHOLD_BATTERY_LOW_WARN    24.0f  // V
 #define THRESHOLD_BATTERY_LOW_CRIT    22.0f
 
+// --- SMS alerting defaults (Change 3) -----------------------
+#define SMS_NUMBERS_DEFAULT     ""          // blank = none configured
+#define SMS_ENABLED_DEFAULT     false       // off by default
+
 // --- OTA / backup -------------------------------------------
 #define OTA_VALIDATE_WINDOW_MS  300000      // 5 min self-validate window
 #define HTTP_CLIENT_TIMEOUT_MS  15000

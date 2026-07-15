@@ -179,4 +179,38 @@ bool modem4g_get_time(struct tm* out) {
     return false;
 }
 
+// ---- SMS (Change 3) -----------------------------------------
+
+bool modem4g_is_registered() {
+    // Network registration is independent of GPRS data.
+    // Any state at or past WAIT_NETWORK means the modem is at least polling.
+    // We check directly: isNetworkConnected() is fast (sends AT+CREG? or similar).
+    if (s_state == Modem4gState::OFF ||
+        s_state == Modem4gState::POWERING ||
+        s_state == Modem4gState::WAIT_AT ||
+        s_state == Modem4gState::FAILED) {
+        return false;
+    }
+    // For WAIT_NETWORK / CONNECTING_GPRS / CONNECTED query the modem directly
+    return s_modem.isNetworkConnected();
+}
+
+bool modem4g_send_sms(const char* number, const char* text) {
+    if (!number || !text || !number[0] || !text[0]) return false;
+    if (!modem4g_is_registered()) {
+        LOG_W("4G", "SMS skipped — modem not registered");
+        return false;
+    }
+    LOG_I("4G", "Sending SMS to %s", number);
+    esp_task_wdt_reset();
+    bool ok = s_modem.sendSMS(number, text);
+    esp_task_wdt_reset();
+    if (ok) {
+        LOG_I("4G", "SMS sent OK");
+    } else {
+        LOG_W("4G", "SMS send failed");
+    }
+    return ok;
+}
+
 Client* modem4g_get_client() { return &s_client; }
