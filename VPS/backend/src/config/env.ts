@@ -2,6 +2,7 @@
  * Zod-validated environment loader.
  * Import `env` anywhere — it fails fast at startup if required vars are missing or malformed.
  */
+import 'dotenv/config'; // load .env before reading process.env (no-op in tests where vars are preset)
 import { z } from 'zod';
 
 const EnvSchema = z.object({
