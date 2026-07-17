@@ -1,0 +1,45 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #6366F1;
+  --color-primary-dark: #7C3AED;
+  --color-ok: #22C55E;
+  --color-warning: #F59E0B;
+  --color-critical: #EF4444;
+  --color-idle: #94A3B8;
+  --color-page-bg: #F1F5F9;
+  --color-card: #FFFFFF;
+  --color-border: #E2E8F0;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--color-page-bg);
+    color: #1E293B;
+  }
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
+  }
+  .status-ok { color: #22C55E; }
+  .status-warning { color: #F59E0B; }
+  .status-critical { color: #EF4444; }
+  .status-idle { color: #94A3B8; }
+  .bg-status-ok { background-color: #22C55E; }
+  .bg-status-warning { background-color: #F59E0B; }
+  .bg-status-critical { background-color: #EF4444; }
+  .bg-status-idle { background-color: #94A3B8; }
+}

@@ -23,6 +23,8 @@ import fireguardDeviceRoutes from './routes/device.routes';
 // ── Billing wiring (Part B) ──────────────────────────────────────────────────
 import bridgeRoutes from './routes/bridge.routes';
 import subscriptionRoutes from './routes/subscription.routes';
+// ── Phase 3 public routes ─────────────────────────────────────────────────────
+import publicRoutes from './routes/public.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -54,6 +56,9 @@ export function createApp(): Express {
       env: env.NODE_ENV,
     });
   });
+
+  // ── Public routes (no auth) ───────────────────────────────────────────────
+  app.use('/api/public', publicRoutes);
 
   // ── Bridge routes (no user auth — X-Bridge-Secret only) ──────────────────
   app.use('/api/bridge', bridgeRoutes);

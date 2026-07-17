@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FireGuard by JENIX — Smart Fire-Fighting System Monitoring</title>
+<meta name="description" content="Real-time monitoring of fire pumps, pressure lines, water tanks and panels. Instant SMS & app alerts, 24×7. Start with a 3-month free trial." />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: { sans: ['Inter','sans-serif'] },
+      colors: {
+        brand: { 50:'#eef2ff',100:'#e0e7ff',500:'#6366f1',600:'#5b54e6',700:'#4f46e5' },
+        violet:{ 500:'#7c3aed',600:'#7029d6' },
+        flame: { 500:'#ef4444',600:'#dc2626' },
+        ok:'#22c55e', warn:'#f59e0b', ink:'#0f172a', slate:'#f1f5f9'
+      }
+    }}
+  }
+</script>
+<style>
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter',sans-serif}
+  .grad{background:linear-gradient(135deg,#6366f1 0%,#7c3aed 55%,#ef4444 130%)}
+  .grad-text{background:linear-gradient(120deg,#6366f1,#7c3aed);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:1rem;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+  .fade{opacity:0;transform:translateY(16px);transition:all .6s ease}
+  .fade.in{opacity:1;transform:none}
+</style>
+</head>
+<body class="bg-slate text-ink antialiased">
+
+<!-- NAV -->
+<header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
+  <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-2 font-extrabold text-lg">
+      <span class="w-9 h-9 grad rounded-lg flex items-center justify-center text-white">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2c1 3-1 4-1 6a3 3 0 0 0 6 0c0-1 0-2-.5-3 2 2 3.5 4.5 3.5 8a8 8 0 1 1-16 0c0-4 3-7 4-9 .5 2 2 3 4 1z"/></svg>
+      </span>
+      Fire<span class="grad-text">Guard</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-7 text-sm font-medium text-slate-600">
+      <a href="#features" class="hover:text-ink">Features</a>
+      <a href="#monitor" class="hover:text-ink">What it monitors</a>
+      <a href="#solutions" class="hover:text-ink">Solutions</a>
+      <a href="#how" class="hover:text-ink">How it works</a>
+      <a href="#pricing" class="hover:text-ink">Pricing</a>
+      <a href="#faq" class="hover:text-ink">FAQ</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <a href="https://fireguard.iotsoft.in/app" class="hidden sm:inline text-sm font-semibold text-slate-600 hover:text-ink">Sign in</a>
+      <a href="https://fireguard.iotsoft.in/app/signup" class="grad text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90">Start free trial</a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="relative overflow-hidden">
+  <div class="max-w-6xl mx-auto px-5 pt-16 pb-20 grid lg:grid-cols-2 gap-12 items-center">
+    <div>
+      <span class="inline-flex items-center gap-2 text-xs font-semibold bg-brand-50 text-brand-700 px-3 py-1 rounded-full">● 3 months free · no card required</span>
+      <h1 class="mt-5 text-4xl md:text-5xl font-extrabold leading-tight">
+        Know your fire system is <span class="grad-text">working</span> — before you need it.
+      </h1>
+      <p class="mt-5 text-lg text-slate-600 max-w-xl">
+        FireGuard monitors your pumps, pressure lines, water tanks and alarm panels in real time —
+        and alerts you the instant something is wrong, by app and SMS, 24×7. Compliance-ready, cloud-connected, always watching.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="https://fireguard.iotsoft.in/app/signup" class="grad text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90">Start free trial →</a>
+        <a href="#how" class="bg-white border border-slate-300 font-semibold px-6 py-3 rounded-xl hover:bg-slate-50">See how it works</a>
+      </div>
+      <div class="mt-8 flex items-center gap-6 text-sm text-slate-500">
+        <div><b class="text-ink text-lg">14+</b> devices/gateway</div>
+        <div><b class="text-ink text-lg">&lt;10s</b> live updates</div>
+        <div><b class="text-ink text-lg">24×7</b> alerting</div>
+      </div>
+    </div>
+    <!-- Dashboard mock -->
+    <div class="relative">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2 text-sm font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-ok"></span> All systems normal</div>
+          <div class="text-xs text-slate-400">Refreshes in 08s</div>
+        </div>
+        <div class="grid grid-cols-4 gap-2 mb-3">
+          <div class="rounded-lg bg-brand-50 p-2 text-center"><div class="text-xl font-extrabold text-brand-700">12</div><div class="text-[10px] text-slate-500">Devices</div></div>
+          <div class="rounded-lg bg-red-50 p-2 text-center"><div class="text-xl font-extrabold text-flame-600">1</div><div class="text-[10px] text-slate-500">Critical</div></div>
+          <div class="rounded-lg bg-amber-50 p-2 text-center"><div class="text-xl font-extrabold text-amber-500">2</div><div class="text-[10px] text-slate-500">Warning</div></div>
+          <div class="rounded-lg bg-emerald-50 p-2 text-center"><div class="text-xl font-extrabold text-ok">65%</div><div class="text-[10px] text-slate-500">Tank</div></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="rounded-lg border border-slate-200 p-2"><div class="text-[10px] text-slate-500">Jockey Pump</div><div class="text-sm font-bold text-ok">Online</div></div>
+          <div class="rounded-lg border border-slate-200 p-2"><div class="text-[10px] text-slate-500">Main Pump 1</div><div class="text-sm font-bold text-ok">Online</div></div>
+          <div class="rounded-lg border-2 border-flame-500 p-2"><div class="text-[10px] text-slate-500">Diesel Pump</div><div class="text-sm font-bold text-flame-600">Fault</div></div>
+        </div>
+        <div class="mt-2 grid grid-cols-2 gap-2">
+          <div class="rounded-lg bg-gradient-to-br from-brand-50 to-white border border-slate-200 p-3 text-center"><div class="text-[10px] text-slate-500">Sprinkler</div><div class="text-lg font-extrabold text-brand-700">6.5<span class="text-xs"> bar</span></div></div>
+          <div class="rounded-lg bg-gradient-to-br from-brand-50 to-white border border-slate-200 p-3 text-center"><div class="text-[10px] text-slate-500">Hydrant</div><div class="text-lg font-extrabold text-brand-700">5.8<span class="text-xs"> bar</span></div></div>
+        </div>
+      </div>
+      <div class="absolute -bottom-4 -right-3 card px-4 py-2 flex items-center gap-2 text-sm font-semibold">
+        <span class="w-2.5 h-2.5 rounded-full bg-flame-500 animate-pulse"></span> SMS sent: Diesel Pump fault
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST -->
+<section class="border-y border-slate-200 bg-white">
+  <div class="max-w-6xl mx-auto px-5 py-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-slate-500 font-medium">
+    <span>RS485 · Modbus RTU</span><span class="text-slate-300">|</span>
+    <span>4G · Ethernet · Wi-Fi failover</span><span class="text-slate-300">|</span>
+    <span>SMS + App alerts</span><span class="text-slate-300">|</span>
+    <span>Offline-safe buffering</span><span class="text-slate-300">|</span>
+    <span>Secure OTA updates</span><span class="text-slate-300">|</span>
+    <span>Multi-site</span>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="max-w-6xl mx-auto px-5 py-20 text-center">
+  <h2 class="text-3xl md:text-4xl font-extrabold">A fire pump that fails silently is worse than no pump at all.</h2>
+  <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">Most fire systems are only checked manually, occasionally. A tripped pump, a dropped pressure line, a low water tank or a dead DG battery can go unnoticed for weeks — until the moment it matters. FireGuard watches everything, all the time, and tells you the instant it changes.</p>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="bg-white border-y border-slate-200">
+  <div class="max-w-6xl mx-auto px-5 py-20">
+    <h2 class="text-3xl font-extrabold text-center">Everything you need to keep fire equipment audit-ready</h2>
+    <div class="mt-12 grid md:grid-cols-3 gap-5">
+      <!-- feature -->
+      <div class="card p-6 fade"><div class="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11h14M4 6h14M4 16h9"/></svg></div><h3 class="font-bold text-lg">Real-time monitoring</h3><p class="mt-2 text-slate-600 text-sm">Live status of pumps, pressure, tank levels, fuel, battery and panels — updated every few seconds on a clean dashboard and mobile app.</p></div>
+      <div class="card p-6 fade"><div class="w-11 h-11 rounded-xl bg-red-50 text-flame-600 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4l7 12H4z"/><path d="M11 9v3M11 14.5v.5"/></svg></div><h3 class="font-bold text-lg">Instant SMS + app alerts</h3><p class="mt-2 text-slate-600 text-sm">Critical alarms reach your team immediately — by push and by SMS over the gateway's own cellular link, even if the internet is down.</p></div>
+      <div class="card p-6 fade"><div class="w-11 h-11 rounded-xl bg-emerald-50 text-ok flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></div><h3 class="font-bold text-lg">Never lose data</h3><p class="mt-2 text-slate-600 text-sm">If connectivity drops, the gateway buffers readings on-board and back-fills the cloud automatically when it reconnects.</p></div>
+      <div class="card p-6 fade"><div class="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M11 7v4l3 2"/></svg></div><h3 class="font-bold text-lg">Triple-redundant uplink</h3><p class="mt-2 text-slate-600 text-sm">4G, Ethernet and Wi-Fi with automatic failover — so your fire system stays connected even when one path fails.</p></div>
+      <div class="card p-6 fade"><div class="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 2v6M11 14v6M2 11h6M14 11h6"/></svg></div><h3 class="font-bold text-lg">AI health insights</h3><p class="mt-2 text-slate-600 text-sm">Daily plain-language insights flag trends — a battery slowly draining, pressure creeping up — before they become failures.</p></div>
+      <div class="card p-6 fade"><div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 2l3 6 6 .8-4.5 4.2L17 20l-6-3.2L5 20l1.5-7L2 8.8 8 8z"/></svg></div><h3 class="font-bold text-lg">Multi-site & roles</h3><p class="mt-2 text-slate-600 text-sm">Manage many buildings from one login, with role-based access for owners, facility managers, maintenance staff and viewers.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT IT MONITORS -->
+<section id="monitor" class="max-w-6xl mx-auto px-5 py-20">
+  <h2 class="text-3xl font-extrabold text-center">One gateway. Your whole fire room.</h2>
+  <p class="mt-3 text-center text-slate-600">The FireGuard Gateway connects over RS485 / Modbus to the equipment you already have.</p>
+  <div class="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="card p-5 text-center"><div class="text-2xl">⛽</div><h4 class="mt-2 font-semibold text-sm">Jockey & Main Pumps</h4></div>
+    <div class="card p-5 text-center"><div class="text-2xl">🛢️</div><h4 class="mt-2 font-semibold text-sm">Diesel Pump & Fuel</h4></div>
+    <div class="card p-5 text-center"><div class="text-2xl">🌡️</div><h4 class="mt-2 font-semibold text-sm">Sprinkler & Hydrant Pressure</h4></div>
+    <div class="card p-5 text-center"><div class="text-2xl">💧</div><h4 class="mt-2 font-semibold text-sm">Water Tank Levels</h4></div>
+    <div class="card p-5 text-center"><div class="text-2xl">🔋</div><h4 class="mt-2 font-semibold text-sm">DG Battery Voltage</h4></div>
+    <div class="card p-5 text-center"><div class="text-2xl">🚨</div><h4 class="mt-2 font-semibold text-sm">Fire Alarm Panel</h4></div>
+    <div class="card p-5 text-center"><div class="text-2xl">📢</div><h4 class="mt-2 font-semibold text-sm">PA & Ventilation</h4></div>
+    <div class="card p-5 text-center"><div class="text-2xl">➕</div><h4 class="mt-2 font-semibold text-sm">Any Modbus device</h4></div>
+  </div>
+  <p class="mt-6 text-center text-xs text-slate-400">Each monitored device that can raise an alarm is a "monitored point" — that's what your plan is billed on.</p>
+</section>
+
+<!-- SOLUTIONS / CAPABILITIES -->
+<section id="solutions" class="bg-white border-y border-slate-200">
+  <div class="max-w-6xl mx-auto px-5 py-20">
+    <div class="text-center max-w-3xl mx-auto">
+      <span class="inline-block text-xs font-semibold bg-violet-50 text-violet-600 px-3 py-1 rounded-full">One platform · endless solutions</span>
+      <h2 class="mt-4 text-3xl md:text-4xl font-extrabold">If you can sense it, we can monitor it — from anywhere.</h2>
+      <p class="mt-4 text-lg text-slate-600">Fire safety is where we started. But the same rugged gateway, cloud dashboard and 24×7 alerting engine can watch and control almost anything — even remote sites with no internet and no power grid. Tell us your problem; we build the solution.</p>
+    </div>
+
+    <div class="mt-14 grid md:grid-cols-3 gap-5">
+      <!-- Fire (flagship) -->
+      <div class="card p-6 fade">
+        <div class="w-11 h-11 rounded-xl bg-red-50 text-flame-600 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 2c1 3-1 4-1 6a3 3 0 0 0 6 0c0-1 0-2-.5-3 2 2 3.5 4.5 3.5 8a8 8 0 1 1-16 0c0-4 3-7 4-9 .5 2 2 3 4 1z"/></svg></div>
+        <h3 class="font-bold text-lg">Fire-fighting systems</h3>
+        <p class="mt-2 text-sm text-slate-600">Pumps, pressure lines, tanks and alarm panels — monitored live, with instant alerts the moment anything fails. Our flagship solution.</p>
+      </div>
+      <!-- Farmhouse pump -->
+      <div class="card p-6 fade">
+        <div class="w-11 h-11 rounded-xl bg-emerald-50 text-ok flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20v-6a7 7 0 0 1 14 0v6M11 7V3M7 20h8"/></svg></div>
+        <h3 class="font-bold text-lg">Farmhouse & agriculture</h3>
+        <p class="mt-2 text-sm text-slate-600">Switch borewell and irrigation pumps on/off from your phone, and watch water levels, tanks and soil — from the city, from anywhere.</p>
+      </div>
+      <!-- Energy metering -->
+      <div class="card p-6 fade">
+        <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
+        <h3 class="font-bold text-lg">Energy & power metering</h3>
+        <p class="mt-2 text-sm text-slate-600">Track kWh, load, power factor and maximum demand across meters. Spot waste, downtime and billing errors before they cost you.</p>
+      </div>
+      <!-- Solar intrusion -->
+      <div class="card p-6 fade">
+        <div class="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="16" height="10" rx="1"/><path d="M6 7h10M6 10h10M2 18h18"/></svg></div>
+        <h3 class="font-bold text-lg">Solar plant security</h3>
+        <p class="mt-2 text-sm text-slate-600">Perimeter intrusion alarms across large solar farms. The instant a fence line or zone is breached, the right people get an SMS — day or night.</p>
+      </div>
+      <!-- River sand theft -->
+      <div class="card p-6 fade">
+        <div class="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16c2-2 4-2 6 0s4 2 6 0 4-2 6 0M2 11c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/></svg></div>
+        <h3 class="font-bold text-lg">Riverbed anti-theft</h3>
+        <p class="mt-2 text-sm text-slate-600">Catch illegal sand mining as it happens. Motion and intrusion detection in remote dry riverbeds, reporting over 4G where there's no internet at all.</p>
+      </div>
+      <!-- Industrial / your own -->
+      <div class="card p-6 fade border-2 border-dashed border-brand-300 bg-brand-50/30">
+        <div class="w-11 h-11 rounded-xl grad text-white flex items-center justify-center mb-4"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4v14M4 11h14"/></svg></div>
+        <h3 class="font-bold text-lg">Your custom solution</h3>
+        <p class="mt-2 text-sm text-slate-600">Cold storage, water treatment, DG sets, industrial process, remote assets — if it has a Modbus signal or a dry contact, we can monitor and alert on it.</p>
+      </div>
+    </div>
+
+    <!-- Building blocks -->
+    <div class="mt-16 rounded-2xl grad p-8 text-white">
+      <h3 class="text-xl font-bold text-center">How one gateway adapts to any problem</h3>
+      <div class="mt-8 grid grid-cols-2 md:grid-cols-3 gap-6 text-sm">
+        <div><div class="font-semibold">📡 RS485 / Modbus</div><p class="text-white/80 mt-1">Read almost any industrial sensor or meter.</p></div>
+        <div><div class="font-semibold">🔌 Digital inputs</div><p class="text-white/80 mt-1">Dry contacts: intrusion, flow, door, level switches.</p></div>
+        <div><div class="font-semibold">⚙️ Relay outputs</div><p class="text-white/80 mt-1">Control pumps, valves and sirens remotely.</p></div>
+        <div><div class="font-semibold">📶 4G built-in</div><p class="text-white/80 mt-1">Works where there is no internet — remote farms, plants, riverbeds.</p></div>
+        <div><div class="font-semibold">✉️ SMS + app alerts</div><p class="text-white/80 mt-1">Reach anyone, anywhere, the instant something changes.</p></div>
+        <div><div class="font-semibold">☁️ Cloud dashboard</div><p class="text-white/80 mt-1">See and control everything from one screen, on any device.</p></div>
+      </div>
+    </div>
+
+    <!-- Custom-solution CTA -->
+    <div class="mt-14 text-center max-w-2xl mx-auto">
+      <h3 class="text-2xl font-extrabold">Have a monitoring or alarm challenge no one else will solve?</h3>
+      <p class="mt-3 text-slate-600">Describe your problem — our team designs, builds and supports a custom monitoring &amp; alerting solution on the same trusted platform. Monitor and control your assets from anywhere in the world.</p>
+      <div class="mt-6 flex flex-wrap justify-center gap-3">
+        <a href="#contact" class="grad text-white font-semibold px-7 py-3 rounded-xl hover:opacity-90">Tell us your challenge →</a>
+        <a href="https://wa.me/917240226566" class="bg-white border border-slate-300 font-semibold px-7 py-3 rounded-xl hover:bg-slate-50">WhatsApp us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="bg-white border-y border-slate-200">
+  <div class="max-w-6xl mx-auto px-5 py-20">
+    <h2 class="text-3xl font-extrabold text-center">Up and running in an afternoon</h2>
+    <div class="mt-12 grid md:grid-cols-3 gap-6">
+      <div class="text-center"><div class="w-14 h-14 grad text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto">1</div><h3 class="mt-4 font-bold">Install the gateway</h3><p class="mt-2 text-sm text-slate-600">Mount the FireGuard Gateway in your pump room and wire it to your equipment over RS485. Power on — it self-configures its uplink.</p></div>
+      <div class="text-center"><div class="w-14 h-14 grad text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto">2</div><h3 class="mt-4 font-bold">Create your login</h3><p class="mt-2 text-sm text-slate-600">Sign up online, map your devices, and your dashboard goes live. Your first 3 months are completely free.</p></div>
+      <div class="text-center"><div class="w-14 h-14 grad text-white rounded-2xl flex items-center justify-center text-xl font-bold mx-auto">3</div><h3 class="mt-4 font-bold">Monitor & relax</h3><p class="mt-2 text-sm text-slate-600">Watch everything from the web dashboard or mobile app, and get alerted the instant anything needs attention.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="max-w-6xl mx-auto px-5 py-20">
+  <div class="text-center">
+    <h2 class="text-3xl font-extrabold">Try it free. Talk pricing later.</h2>
+    <p class="mt-3 text-slate-600">Every plan starts with <b>3 months completely free</b> — no card, no commitment. After your trial we tailor a simple per-device annual plan to your site, so you only pay once FireGuard has proven its worth.</p>
+  </div>
+  <div class="mt-12 grid md:grid-cols-3 gap-5 items-stretch">
+    <!-- Starter -->
+    <div class="card p-7 flex flex-col">
+      <h3 class="font-bold text-lg">Starter</h3>
+      <p class="text-sm text-slate-500 mt-1">Single small site</p>
+      <div class="mt-5"><span class="text-2xl font-extrabold text-ok">3 months free</span></div>
+      <p class="text-xs text-slate-400 mt-1">up to 10 devices · 1 gateway</p>
+      <ul class="mt-6 space-y-2 text-sm text-slate-600 flex-1">
+        <li>✓ Real-time dashboard + app</li><li>✓ App push alerts</li><li>✓ 90-day history</li><li>✓ Email support</li>
+      </ul>
+      <a href="https://fireguard.iotsoft.in/app/signup" class="mt-6 text-center bg-white border border-slate-300 font-semibold px-5 py-2.5 rounded-lg hover:bg-slate-50">Start free</a>
+    </div>
+    <!-- Professional -->
+    <div class="card p-7 flex flex-col ring-2 ring-brand-500 relative">
+      <span class="absolute -top-3 left-1/2 -translate-x-1/2 grad text-white text-xs font-semibold px-3 py-1 rounded-full">Most popular</span>
+      <h3 class="font-bold text-lg">Professional</h3>
+      <p class="text-sm text-slate-500 mt-1">Commercial buildings</p>
+      <div class="mt-5"><span class="text-2xl font-extrabold text-ok">3 months free</span></div>
+      <p class="text-xs text-slate-400 mt-1">up to 50 devices · multi-gateway</p>
+      <ul class="mt-6 space-y-2 text-sm text-slate-600 flex-1">
+        <li>✓ Everything in Starter</li><li>✓ <b>SMS alerts</b> to multiple numbers</li><li>✓ AI health insights</li><li>✓ 1-year history + reports</li><li>✓ Multi-site & roles</li><li>✓ Priority support</li>
+      </ul>
+      <a href="https://fireguard.iotsoft.in/app/signup" class="mt-6 text-center grad text-white font-semibold px-5 py-2.5 rounded-lg hover:opacity-90">Start free</a>
+    </div>
+    <!-- Enterprise -->
+    <div class="card p-7 flex flex-col">
+      <h3 class="font-bold text-lg">Enterprise</h3>
+      <p class="text-sm text-slate-500 mt-1">Campuses & portfolios</p>
+      <div class="mt-5"><span class="text-2xl font-extrabold text-ok">3 months free</span></div>
+      <p class="text-xs text-slate-400 mt-1">unlimited devices & sites</p>
+      <ul class="mt-6 space-y-2 text-sm text-slate-600 flex-1">
+        <li>✓ Everything in Professional</li><li>✓ Unlimited retention</li><li>✓ API & integrations</li><li>✓ SLA + dedicated support</li><li>✓ On-site onboarding</li>
+      </ul>
+      <a href="#contact" class="mt-6 text-center bg-white border border-slate-300 font-semibold px-5 py-2.5 rounded-lg hover:bg-slate-50">Talk to us</a>
+    </div>
+  </div>
+  <p class="text-center text-xs text-slate-400 mt-6">Hardware (FireGuard Gateway) sold separately, one-time. After the free trial, a simple per-device annual plan is tailored to your site — <b>ask us for a quote</b> whenever you're ready.</p>
+</section>
+
+<!-- CTA -->
+<section id="login" class="bg-white border-y border-slate-200">
+  <div class="max-w-4xl mx-auto px-5 py-16 text-center">
+    <h2 class="text-3xl font-extrabold">Start your 3 months free today</h2>
+    <p class="mt-3 text-slate-600">Create your login, map your devices, and see your fire system come alive on screen — no card, no commitment.</p>
+    <div class="mt-7 flex flex-wrap justify-center gap-3">
+      <a href="https://fireguard.iotsoft.in/app/signup" class="grad text-white font-semibold px-7 py-3 rounded-xl hover:opacity-90">Create free account →</a>
+      <a href="#contact" class="bg-white border border-slate-300 font-semibold px-7 py-3 rounded-xl hover:bg-slate-50">Book a demo</a>
+    </div>
+    <p class="mt-3 text-xs text-slate-400">Signup & billing handled securely by IOT Soft.</p>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="max-w-4xl mx-auto px-5 py-20">
+  <h2 class="text-3xl font-extrabold text-center">Frequently asked</h2>
+  <div class="mt-10 space-y-3" id="faqList">
+    <details class="card p-5"><summary class="font-semibold cursor-pointer">What exactly is billed "per device"?</summary><p class="mt-3 text-sm text-slate-600">Each piece of equipment you connect that can raise an alarm — a pump, a pressure sensor, a tank, a panel — counts as one monitored device. You only pay for what you actually monitor, and only after your 3-month free trial.</p></details>
+    <details class="card p-5"><summary class="font-semibold cursor-pointer">Do I need internet at the site?</summary><p class="mt-3 text-sm text-slate-600">The gateway works over 4G (SIM), Ethernet or Wi-Fi and automatically fails over between them. Critical SMS alerts go out over cellular even if broadband is down.</p></details>
+    <details class="card p-5"><summary class="font-semibold cursor-pointer">What if the connection drops?</summary><p class="mt-3 text-sm text-slate-600">Readings are buffered on the gateway and back-filled to the cloud when it reconnects, so you never lose history.</p></details>
+    <details class="card p-5"><summary class="font-semibold cursor-pointer">Will it work with my existing fire equipment?</summary><p class="mt-3 text-sm text-slate-600">If your pumps, sensors and panels support RS485 / Modbus (most modern fire equipment does), FireGuard connects to them. We help you map them during onboarding.</p></details>
+    <details class="card p-5"><summary class="font-semibold cursor-pointer">Is my data secure?</summary><p class="mt-3 text-sm text-slate-600">Yes. Access is role-based and authenticated, data is stored securely, and firmware is updated over secure OTA with automatic rollback protection.</p></details>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="contact" class="grad text-white">
+  <div class="max-w-6xl mx-auto px-5 py-14 grid md:grid-cols-3 gap-8">
+    <div>
+      <div class="font-extrabold text-xl">FireGuard</div>
+      <p class="mt-3 text-sm text-white/80 max-w-xs">Smart fire-fighting system monitoring. A product by IOT Soft / JENIX.</p>
+    </div>
+    <div class="text-sm">
+      <div class="font-semibold mb-3">Product</div>
+      <ul class="space-y-2 text-white/80"><li><a href="#features" class="hover:text-white">Features</a></li><li><a href="#pricing" class="hover:text-white">Pricing</a></li><li><a href="#how" class="hover:text-white">How it works</a></li></ul>
+    </div>
+    <div class="text-sm">
+      <div class="font-semibold mb-3">Contact</div>
+      <ul class="space-y-2 text-white/80">
+        <li>WhatsApp: +91 72402 26566</li>
+        <li>Email: iotsoft.in@gmail.com</li>
+        <li>iotsoft.in</li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-white/20 text-center text-xs text-white/70 py-5">© 2026 IOT Soft · FireGuard by JENIX. All rights reserved.</div>
+</footer>
+
+<script>
+  // reveal on scroll
+  const io = new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.12});
+  document.querySelectorAll('.fade').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
