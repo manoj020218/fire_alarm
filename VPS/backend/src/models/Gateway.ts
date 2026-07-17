@@ -24,8 +24,8 @@ export interface IGateway {
   heap?: number;
   /** One-time code (printed on the unit) a customer enters to claim a pool gateway */
   claimCode?: string;
-  /** false = pre-provisioned in the pool, not yet bound to a customer site */
-  claimed: boolean;
+  /** false = pre-provisioned in the pool, not yet bound to a customer site (schema default: true) */
+  claimed?: boolean;
 }
 
 export interface IGatewayDocument extends IGateway, Document {}
