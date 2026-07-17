@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import { validate } from '../middleware/validate.middleware';
+import { subscriptionGate } from '../middleware/subscriptionGate';
 import {
   GatewayParamsSchema,
   UpdateGatewaySchema,
@@ -31,6 +32,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
+router.use(subscriptionGate);
 
 router.get('/', listGateways);
 router.get('/:id', validate({ params: GatewayParamsSchema }), getGateway);

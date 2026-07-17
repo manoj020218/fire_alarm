@@ -25,4 +25,7 @@ export default async function globalSetup(): Promise<void> {
   process.env['NODE_ENV'] = 'test';
   process.env['PORT'] = '3099';
   process.env['TELEMETRY_RETENTION_DAYS'] = '90';
+  process.env['BRIDGE_SECRET'] = 'test-bridge-secret-min16chars';
+  process.env['BILLING_BASE'] = 'https://iotsoft.in';
+  process.env['APP_LOGIN_URL'] = 'https://fireguard.iotsoft.in/app';
 }

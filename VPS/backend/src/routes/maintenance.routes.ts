@@ -8,6 +8,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import { validate } from '../middleware/validate.middleware';
+import { subscriptionGate } from '../middleware/subscriptionGate';
 import {
   MaintenanceQuerySchema,
   MaintenanceParamsSchema,
@@ -22,6 +23,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
+router.use(subscriptionGate);
 
 router.get('/', validate({ query: MaintenanceQuerySchema }), listMaintenanceLogs);
 router.get('/:id', validate({ params: MaintenanceParamsSchema }), getMaintenanceLog);

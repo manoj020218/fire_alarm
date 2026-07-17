@@ -10,6 +10,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import { validate } from '../middleware/validate.middleware';
+import { subscriptionGate } from '../middleware/subscriptionGate';
 import {
   UserQuerySchema,
   UserParamsSchema,
@@ -27,6 +28,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
+router.use(subscriptionGate);
 router.use(requireRole('CLIENT_ADMIN'));
 
 router.get('/', validate({ query: UserQuerySchema }), listUsers);

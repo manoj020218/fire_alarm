@@ -20,6 +20,9 @@ import userRoutes from './routes/users.routes';
 import maintenanceRoutes from './routes/maintenance.routes';
 // ── Phase 2C route imports ────────────────────────────────────────────────────
 import fireguardDeviceRoutes from './routes/device.routes';
+// ── Billing wiring (Part B) ──────────────────────────────────────────────────
+import bridgeRoutes from './routes/bridge.routes';
+import subscriptionRoutes from './routes/subscription.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -52,7 +55,18 @@ export function createApp(): Express {
     });
   });
 
+  // ── Bridge routes (no user auth — X-Bridge-Secret only) ──────────────────
+  app.use('/api/bridge', bridgeRoutes);
+
+  // ── Subscription query (auth, never gated) ────────────────────────────────
+  app.use('/api/subscription', subscriptionRoutes);
+
+  // Phase 2C: device HTTP contract (gateway device auth — NEVER gated)
+  app.use('/api/fireguard', fireguardDeviceRoutes);
+
   // ── Phase 2B REST routes ───────────────────────────────────────────────────
+  // NOTE: subscriptionGate is applied INSIDE each management router, immediately
+  // after authenticate, so req.user is populated when the gate runs.
   app.use('/api/auth', authRoutes);
   app.use('/api/sites', siteRoutes);
   app.use('/api/gateways', gatewayRoutes);
@@ -63,9 +77,6 @@ export function createApp(): Express {
   app.use('/api/reports', reportRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/maintenance', maintenanceRoutes);
-
-  // Phase 2C: device HTTP contract (gateway device auth)
-  app.use('/api/fireguard', fireguardDeviceRoutes);
 
   // ── Central error handler (MUST be last) ──────────────────────────────────
   app.use(errorHandler);

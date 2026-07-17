@@ -40,6 +40,11 @@ const EnvSchema = z.object({
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+
+  // ── Billing bridge ────────────────────────────────────────────────────────
+  BRIDGE_SECRET: z.string().min(16, 'BRIDGE_SECRET must be at least 16 chars').default('dev-bridge-secret-change-in-prod'),
+  BILLING_BASE: z.string().url('BILLING_BASE must be a valid URL').default('https://iotsoft.in'),
+  APP_LOGIN_URL: z.string().url('APP_LOGIN_URL must be a valid URL').default('https://fireguard.iotsoft.in/app'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

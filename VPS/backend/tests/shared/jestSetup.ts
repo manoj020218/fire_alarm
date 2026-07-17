@@ -13,3 +13,7 @@ process.env['PORT'] = process.env['PORT'] ?? '3099';
 process.env['TELEMETRY_RETENTION_DAYS'] = process.env['TELEMETRY_RETENTION_DAYS'] ?? '90';
 // MONGODB_URI: globalSetup sets this; if running solo provide a fallback
 process.env['MONGODB_URI'] = process.env['MONGODB_URI'] ?? 'mongodb://localhost:27017/fireguard_test_fallback';
+// Billing bridge
+process.env['BRIDGE_SECRET'] = process.env['BRIDGE_SECRET'] ?? 'test-bridge-secret-min16chars';
+process.env['BILLING_BASE'] = process.env['BILLING_BASE'] ?? 'https://iotsoft.in';
+process.env['APP_LOGIN_URL'] = process.env['APP_LOGIN_URL'] ?? 'https://fireguard.iotsoft.in/app';

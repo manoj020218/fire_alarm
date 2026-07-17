@@ -10,6 +10,7 @@ import logger from './config/logger';
 import { initSocketServer, closeSocketServer } from './socket/socketServer';
 import { initMqtt, closeMqtt } from './mqtt/mqttClient';
 import { startOfflineDetector, stopOfflineDetector } from './services/offlineDetector';
+import { startUsageReporter, stopUsageReporter } from './services/usageReporter';
 
 async function boot(): Promise<void> {
   await connectDB();
@@ -30,11 +31,15 @@ async function boot(): Promise<void> {
   // Start gateway offline detector
   startOfflineDetector();
 
+  // Start billing usage reporter (fires once ~60s after boot, then daily)
+  startUsageReporter();
+
   // ── Graceful shutdown ──────────────────────────────────────────────────────
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'Shutdown signal received');
 
     stopOfflineDetector();
+    stopUsageReporter();
 
     await closeMqtt();
 

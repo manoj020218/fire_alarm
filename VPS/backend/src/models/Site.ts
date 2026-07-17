@@ -3,6 +3,8 @@
  */
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
+export type SubscriptionStatus = 'trial' | 'active' | 'suspended' | 'expired';
+
 export interface ISite {
   siteId: string;
   name: string;
@@ -11,6 +13,12 @@ export interface ISite {
   active: boolean;
   contactName?: string;
   contactPhone?: string;
+  // ── Billing / subscription fields ─────────────────────────────────────────
+  subscription: SubscriptionStatus;
+  trialEndsAt?: Date;
+  graceDays: number;
+  deviceLimit?: number;      // undefined/null = unlimited
+  billingClientId?: string;
 }
 
 export interface ISiteDocument extends ISite, Document {}
@@ -48,6 +56,17 @@ const SiteSchema = new Schema<ISiteDocument>(
     },
     contactName: { type: String, trim: true, maxlength: 100 },
     contactPhone: { type: String, trim: true, maxlength: 20 },
+    // ── Billing / subscription ───────────────────────────────────────────────
+    subscription: {
+      type: String,
+      enum: ['trial', 'active', 'suspended', 'expired'],
+      default: 'trial',
+      required: true,
+    },
+    trialEndsAt: { type: Date },
+    graceDays: { type: Number, default: 15, min: 0, max: 365 },
+    deviceLimit: { type: Number, min: 0 },         // absent = unlimited
+    billingClientId: { type: String, trim: true },
   },
   {
     timestamps: true,

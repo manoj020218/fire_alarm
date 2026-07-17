@@ -17,6 +17,9 @@ export const SITE_ABC: Omit<ISite, never> = {
   active: true,
   contactName: 'Rajesh Kumar',
   contactPhone: '+91 98765 43210',
+  // Subscription defaults (all tests that use this fixture get a valid trial site)
+  subscription: 'trial',
+  graceDays: 15,
 };
 
 // ─── Gateway ──────────────────────────────────────────────────────────────────

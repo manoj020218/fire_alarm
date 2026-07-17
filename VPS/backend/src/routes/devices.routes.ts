@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/rbac.middleware';
 import { validate } from '../middleware/validate.middleware';
+import { subscriptionGate } from '../middleware/subscriptionGate';
 import {
   GatewayDevicesParamsSchema,
   DeviceParamsSchema,
@@ -24,6 +25,7 @@ import {
 const router = Router({ mergeParams: true });
 
 router.use(authenticate);
+router.use(subscriptionGate);
 
 router.get('/', validate({ params: GatewayDevicesParamsSchema }), listDevices);
 router.get('/:deviceId', validate({ params: DeviceParamsSchema }), getDevice);
