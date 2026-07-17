@@ -13,7 +13,9 @@ export type AuditAction =
   | 'ACK_ALARM'
   | 'OTA_TRIGGER'
   | 'CONFIG_CHANGE'
-  | 'DEVICE_TOKEN_ROTATE';
+  | 'DEVICE_TOKEN_ROTATE'
+  | 'GATEWAY_CLAIM'
+  | 'GATEWAY_POOL_CREATE';
 
 export interface IAuditLog {
   actor: string;          // userId or 'SYSTEM' or 'DEVICE:{gatewayId}'
@@ -38,6 +40,7 @@ const AuditLogSchema = new Schema<IAuditLogDocument>(
       enum: [
         'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT',
         'ACK_ALARM', 'OTA_TRIGGER', 'CONFIG_CHANGE', 'DEVICE_TOKEN_ROTATE',
+        'GATEWAY_CLAIM', 'GATEWAY_POOL_CREATE',
       ],
       required: true,
     },

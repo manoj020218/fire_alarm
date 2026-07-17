@@ -2,9 +2,9 @@ import { type ReactNode, useState, useEffect } from 'react'
 import { formatTime, formatDate } from '../../lib/utils'
 import AlarmIcon from '../icons/AlarmIcon'
 import NavDashboardIcon from '../icons/NavDashboardIcon'
-import NavKitIcon from '../icons/NavKitIcon'
 import NavAlarmsIcon from '../icons/NavAlarmsIcon'
 import NavSettingsIcon from '../icons/NavSettingsIcon'
+import GatewayIcon from '../icons/GatewayIcon'
 import RefreshCountdown from './RefreshCountdown'
 
 interface NavItem {
@@ -19,11 +19,32 @@ interface Props {
   alarmCount?: number
   siteName?: string
   userName?: string
+  userRole?: string
   onNavigate?: (path: string) => void
   onRefresh?: () => void
 }
 
-export default function AppShell({ children, currentPath, alarmCount = 0, siteName = 'ABC Towers', userName = 'Admin', onNavigate, onRefresh }: Props) {
+// Inline nav icons for pages without a dedicated icon component
+const TrendsIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
+)
+const ReportsIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></svg>
+)
+
+// Human-readable role label
+function roleLabel(role?: string): string {
+  switch (role) {
+    case 'JENIX_SUPER_ADMIN': return 'Super Admin'
+    case 'VENDOR_ADMIN': return 'Vendor Admin'
+    case 'CLIENT_ADMIN': return 'Client Admin'
+    case 'MAINTENANCE_USER': return 'Maintenance'
+    case 'VIEWER': return 'Viewer'
+    default: return 'User'
+  }
+}
+
+export default function AppShell({ children, currentPath, alarmCount = 0, siteName = 'ABC Towers', userName = 'Admin', userRole, onNavigate, onRefresh }: Props) {
   const [clock, setClock] = useState(new Date())
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -34,10 +55,14 @@ export default function AppShell({ children, currentPath, alarmCount = 0, siteNa
 
   const navItems: NavItem[] = [
     { path: '/dashboard', label: 'Dashboard', icon: <NavDashboardIcon size={18} /> },
-    { path: '/kit', label: 'Component Kit', icon: <NavKitIcon size={18} /> },
+    { path: '/gateways', label: 'Gateways', icon: <GatewayIcon size={18} /> },
     { path: '/alarms', label: 'Alarms', icon: <NavAlarmsIcon size={18} /> },
+    { path: '/trends', label: 'Trends', icon: <TrendsIcon size={18} /> },
+    { path: '/reports', label: 'Reports', icon: <ReportsIcon size={18} /> },
     { path: '/settings', label: 'Settings', icon: <NavSettingsIcon size={18} /> },
   ]
+  // Mobile bottom bar shows the 5 most-used destinations
+  const mobileNav = navItems.filter(i => i.path !== '/reports')
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
@@ -91,7 +116,7 @@ export default function AppShell({ children, currentPath, alarmCount = 0, siteNa
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-slate-200 font-medium truncate">{userName}</p>
-            <p className="text-xs text-slate-500">Client Admin</p>
+            <p className="text-xs text-slate-500">{roleLabel(userRole)}</p>
           </div>
         </div>
       </aside>
@@ -130,7 +155,7 @@ export default function AppShell({ children, currentPath, alarmCount = 0, siteNa
 
         {/* Mobile bottom nav */}
         <nav className="lg:hidden border-t border-slate-200 bg-white flex">
-          {navItems.map(item => {
+          {mobileNav.map(item => {
             const active = currentPath === item.path
             return (
               <button

@@ -145,6 +145,62 @@ export interface AlarmsResponse {
   }
 }
 
+// ── Add-Gateway (claim) ─────────────────────────────────────────────────────────
+
+export interface ClaimGatewayPayload {
+  gatewayId: string
+  claimCode: string
+  name?: string
+  siteId?: string
+}
+
+export interface ClaimGatewayResponse {
+  ok: boolean
+  gateway: GatewayItem
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+export type ReportType = 'daily' | 'weekly' | 'monthly' | 'custom' | 'alarm_summary'
+
+export interface ReportItem {
+  _id: string
+  siteId: string
+  type: ReportType
+  format: 'pdf' | 'csv' | 'excel'
+  status: 'pending' | 'generating' | 'ready' | 'failed'
+  requestedAt: string
+  rangeFrom: string
+  rangeTo: string
+  fileSize?: number
+  error?: string
+}
+
+export interface ReportsResponse {
+  ok: boolean
+  reports: ReportItem[]
+  pagination: { page: number; limit: number; total: number; pages: number }
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+export interface UserItem {
+  _id: string
+  id?: string
+  email: string
+  name: string
+  role: string
+  siteIds: string[]
+  active?: boolean
+  lastLoginAt?: string
+  createdAt?: string
+}
+
+export interface UsersResponse {
+  ok: boolean
+  users: UserItem[]
+}
+
 // ── Public signup ─────────────────────────────────────────────────────────────
 
 export interface SignupPayload {

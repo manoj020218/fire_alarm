@@ -31,5 +31,23 @@ export const GatewayCommandSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
 });
 
+// ── Add-Gateway (claim) ────────────────────────────────────────────────────────
+
+/** Customer claims a pre-provisioned gateway using the code printed on the unit. */
+export const ClaimGatewaySchema = z.object({
+  gatewayId: z.string().min(3).max(64).trim(),
+  claimCode: z.string().min(4).max(32).trim(),
+  name: z.string().min(1).max(100).trim().optional(),
+  siteId: z.string().min(1).optional(),
+});
+
+/** Super-admin pre-provisions a gateway into the claimable pool. */
+export const PoolGatewaySchema = z.object({
+  gatewayId: z.string().min(3).max(64).trim(),
+  name: z.string().min(1).max(100).trim().optional(),
+});
+
 export type GatewayConfigBody = z.infer<typeof GatewayConfigSchema>;
 export type GatewayCommandBody = z.infer<typeof GatewayCommandSchema>;
+export type ClaimGatewayBody = z.infer<typeof ClaimGatewaySchema>;
+export type PoolGatewayBody = z.infer<typeof PoolGatewaySchema>;

@@ -18,6 +18,8 @@ import {
   UpdateGatewaySchema,
   GatewayConfigSchema,
   GatewayCommandSchema,
+  ClaimGatewaySchema,
+  PoolGatewaySchema,
 } from '../validation/gateways.schema';
 import {
   listGateways,
@@ -27,12 +29,28 @@ import {
   putGatewayConfig,
   sendGatewayCommand,
   rotateDeviceToken,
+  claimGateway,
+  createPoolGateway,
 } from '../controllers/gateways.controller';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(subscriptionGate);
+
+// Static paths must precede '/:id' so they are not captured as an id.
+router.post(
+  '/claim',
+  requireRole('CLIENT_ADMIN'),
+  validate({ body: ClaimGatewaySchema }),
+  claimGateway
+);
+router.post(
+  '/pool',
+  requireRole('JENIX_SUPER_ADMIN'),
+  validate({ body: PoolGatewaySchema }),
+  createPoolGateway
+);
 
 router.get('/', listGateways);
 router.get('/:id', validate({ params: GatewayParamsSchema }), getGateway);

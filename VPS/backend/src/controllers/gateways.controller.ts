@@ -10,7 +10,20 @@ import { publishGatewayConfig, publishGatewayCommand } from '../services/deviceC
 import { scopeFilter, canAccessSite } from '../utils/scope';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
-import type { GatewayConfigBody, GatewayCommandBody } from '../validation/gateways.schema';
+import type {
+  GatewayConfigBody,
+  GatewayCommandBody,
+  ClaimGatewayBody,
+  PoolGatewayBody,
+} from '../validation/gateways.schema';
+
+/** Generate a short, human-friendly, unambiguous claim code (no 0/O/1/I). */
+function generateClaimCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
 
 // ── GET /api/gateways ─────────────────────────────────────────────────────────
 
@@ -172,5 +185,87 @@ export const rotateDeviceToken = asyncHandler(
     });
 
     res.json({ ok: true, gatewayId: id, deviceToken: newToken });
+  }
+);
+
+// ── POST /api/gateways/claim ─────────────────────────────────────────────────
+// A customer binds a pre-provisioned pool gateway to their own site using the
+// gatewayId + claim code printed on the unit. CLIENT_ADMIN+ only.
+
+export const claimGateway = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw AppError.unauthorized();
+    const { gatewayId, claimCode, name, siteId } = req.body as ClaimGatewayBody;
+
+    // Resolve target site: explicit (must be accessible) or the caller's first site.
+    const targetSite = siteId ?? req.user.siteIds[0];
+    if (!targetSite) throw AppError.badRequest('No site to attach this gateway to.');
+    if (!canAccessSite(req.user, targetSite)) throw AppError.forbidden();
+
+    const gateway = await Gateway.findOne({ gatewayId: gatewayId.toUpperCase() }).select(
+      '+claimCode'
+    );
+    if (!gateway) throw AppError.notFound('Gateway');
+
+    if (gateway.claimed) {
+      throw AppError.conflict('This gateway is already registered to an account.');
+    }
+    if (!gateway.claimCode || gateway.claimCode !== claimCode.toUpperCase()) {
+      throw AppError.badRequest('Invalid claim code for this gateway.');
+    }
+
+    gateway.siteId = targetSite;
+    gateway.claimed = true;
+    gateway.claimCode = undefined;
+    if (name) gateway.name = name;
+    await gateway.save();
+
+    await writeAudit({
+      action: 'GATEWAY_CLAIM',
+      entity: 'Gateway',
+      entityId: gateway.gatewayId,
+      req,
+    });
+
+    const obj = gateway.toObject() as unknown as Record<string, unknown>;
+    delete obj.claimCode;
+    delete obj.deviceToken;
+    res.status(201).json({ ok: true, gateway: obj });
+  }
+);
+
+// ── POST /api/gateways/pool ──────────────────────────────────────────────────
+// Super-admin pre-provisions a gateway into the claimable pool. Returns the
+// claimCode + deviceToken ONCE (to print on the box / flash to the device).
+
+export const createPoolGateway = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw AppError.unauthorized();
+    const { gatewayId, name } = req.body as PoolGatewayBody;
+
+    const gwId = gatewayId.toUpperCase();
+    const existing = await Gateway.findOne({ gatewayId: gwId });
+    if (existing) throw AppError.conflict('A gateway with this ID already exists.');
+
+    const claimCode = generateClaimCode();
+    const deviceToken = randomUUID().replace(/-/g, '');
+
+    await Gateway.create({
+      gatewayId: gwId,
+      siteId: 'POOL',
+      name: name ?? `Gateway ${gwId}`,
+      deviceToken,
+      claimCode,
+      claimed: false,
+    });
+
+    await writeAudit({
+      action: 'GATEWAY_POOL_CREATE',
+      entity: 'Gateway',
+      entityId: gwId,
+      req,
+    });
+
+    res.status(201).json({ ok: true, gatewayId: gwId, claimCode, deviceToken });
   }
 );

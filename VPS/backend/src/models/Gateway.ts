@@ -22,6 +22,10 @@ export interface IGateway {
   signalLan?: boolean;
   uptime?: number;
   heap?: number;
+  /** One-time code (printed on the unit) a customer enters to claim a pool gateway */
+  claimCode?: string;
+  /** false = pre-provisioned in the pool, not yet bound to a customer site */
+  claimed: boolean;
 }
 
 export interface IGatewayDocument extends IGateway, Document {}
@@ -73,6 +77,9 @@ const GatewaySchema = new Schema<IGatewayDocument>(
     signalLan: { type: Boolean },
     uptime: { type: Number, min: 0 },
     heap: { type: Number, min: 0 },
+    /** Hidden by default; only surfaced to super-admin at pool creation */
+    claimCode: { type: String, select: false, trim: true, uppercase: true },
+    claimed: { type: Boolean, default: true },
   },
   {
     timestamps: true,
