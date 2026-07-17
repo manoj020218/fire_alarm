@@ -1,0 +1,14 @@
+{
+  "appId": "in.iotsoft.fireguard",
+  "appName": "FireGuard",
+  "webDir": "www",
+  "server": {
+    "url": "https://fireguard.iotsoft.in/app",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "backgroundColor": "#0f172a",
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 1200, "backgroundColor": "#4f46e5", "showSpinner": false }
+  }
+}
