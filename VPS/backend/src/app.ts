@@ -18,6 +18,7 @@ import telemetryRoutes from './routes/telemetry.routes';
 import reportRoutes from './routes/reports.routes';
 import userRoutes from './routes/users.routes';
 import maintenanceRoutes from './routes/maintenance.routes';
+import pushRoutes from './routes/push.routes';
 // ── Phase 2C route imports ────────────────────────────────────────────────────
 import fireguardDeviceRoutes from './routes/device.routes';
 // ── Billing wiring (Part B) ──────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export function createApp(): Express {
   app.use('/api/reports', reportRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/maintenance', maintenanceRoutes);
+  app.use('/api/push', pushRoutes);
 
   // ── Central error handler (MUST be last) ──────────────────────────────────
   app.use(errorHandler);

@@ -22,6 +22,8 @@ export interface IAlarm {
   acknowledgeReason?: string;
   /** 'mqtt' | 'http' */
   source: 'mqtt' | 'http';
+  /** set once a push notification has been sent, so device resends don't re-notify */
+  notifiedAt?: Date;
 }
 
 export interface IAlarmDocument extends IAlarm, Document {}
@@ -50,6 +52,7 @@ const AlarmSchema = new Schema<IAlarmDocument>(
     acknowledgedAt: { type: Date },
     acknowledgeReason: { type: String, maxlength: 500 },
     source: { type: String, enum: ['mqtt', 'http'], required: true, default: 'mqtt' },
+    notifiedAt: { type: Date },
   },
   {
     timestamps: true,

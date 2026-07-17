@@ -5,6 +5,7 @@
  */
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { api } from './api'
+import { unregisterPush } from './push'
 import type { AuthUser, LoginResponse } from './types'
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
@@ -72,9 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
-    clearSession()
-    setUser(null)
-    window.location.href = '/app/login'
+    void unregisterPush().finally(() => {
+      clearSession()
+      setUser(null)
+      window.location.href = '/app/login'
+    })
   }, [])
 
   const siteId = user?.siteIds?.[0] ?? null

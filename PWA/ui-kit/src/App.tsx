@@ -5,8 +5,10 @@
  * Protected: /dashboard, /gateways, /alarms, /trends, /reports, /settings
  * Default '/' → /dashboard
  */
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/auth'
+import { initPush } from './lib/push'
 import Dashboard from './pages/Dashboard'
 import Gateways from './pages/Gateways'
 import Alarms from './pages/Alarms'
@@ -25,6 +27,13 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const { isAuthenticated } = useAuth()
+
+  // Register for FCM push once the user is signed in (native app only).
+  useEffect(() => {
+    if (isAuthenticated) void initPush()
+  }, [isAuthenticated])
+
   return (
     <BrowserRouter basename="/app">
       <Routes>

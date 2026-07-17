@@ -25,6 +25,8 @@ const EnvSchema = z.object({
   TELEMETRY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
 
   FCM_SERVER_KEY: z.string().optional(),
+  /** Path to a Firebase service-account JSON for FCM HTTP v1 (firebase-admin) */
+  FIREBASE_SERVICE_ACCOUNT_FILE: z.string().optional(),
   WHATSAPP_API_URL: z.string().url().optional(),
   WHATSAPP_TOKEN: z.string().optional(),
   SMTP_HOST: z.string().optional(),

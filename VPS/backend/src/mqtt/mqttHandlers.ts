@@ -13,6 +13,7 @@ import {
   type IDeviceReading,
 } from '../models/Telemetry';
 import { Alarm } from '../models/Alarm';
+import { sendAlarmPush } from '../services/pushService';
 import logger from '../config/logger';
 import {
   emitTelemetry,
@@ -286,6 +287,12 @@ export async function handleAlarm(
 
     if (alarm) {
       emitAlarm(d.siteId, alarm.toObject());
+
+      // Push once per active alarm (device may resend the same alarmId).
+      if (alarm.active && !alarm.notifiedAt) {
+        await Alarm.updateOne({ _id: alarm._id }, { $set: { notifiedAt: new Date() } });
+        void sendAlarmPush(alarm);
+      }
     }
   } catch (err) {
     logger.error({ err, alarmId: d.alarmId }, 'Failed to persist alarm');
