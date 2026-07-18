@@ -16,6 +16,7 @@ import {
   UserParamsSchema,
   CreateUserSchema,
   UpdateUserSchema,
+  ResetPasswordSchema,
 } from '../validation/users.schema';
 import {
   listUsers,
@@ -23,6 +24,7 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  resetUserPassword,
 } from '../controllers/users.controller';
 
 const router = Router();
@@ -35,6 +37,11 @@ router.get('/', validate({ query: UserQuerySchema }), listUsers);
 router.get('/:id', validate({ params: UserParamsSchema }), getUser);
 router.post('/', validate({ body: CreateUserSchema }), createUser);
 router.put('/:id', validate({ params: UserParamsSchema, body: UpdateUserSchema }), updateUser);
+router.post(
+  '/:id/reset-password',
+  validate({ params: UserParamsSchema, body: ResetPasswordSchema }),
+  resetUserPassword
+);
 router.delete('/:id', validate({ params: UserParamsSchema }), deleteUser);
 
 export default router;

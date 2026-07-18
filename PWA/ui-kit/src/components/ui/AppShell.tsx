@@ -11,6 +11,7 @@ interface NavItem {
   path: string
   label: string
   icon: ReactNode
+  adminOnly?: boolean
 }
 
 interface Props {
@@ -30,6 +31,9 @@ const TrendsIcon = ({ size = 18 }: { size?: number }) => (
 )
 const ReportsIcon = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></svg>
+)
+const UsersIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
 )
 
 // Human-readable role label
@@ -53,16 +57,18 @@ export default function AppShell({ children, currentPath, alarmCount = 0, siteNa
     return () => clearInterval(t)
   }, [])
 
+  const canManageUsers = ['CLIENT_ADMIN', 'VENDOR_ADMIN', 'JENIX_SUPER_ADMIN'].includes(userRole ?? '')
   const navItems: NavItem[] = [
     { path: '/dashboard', label: 'Dashboard', icon: <NavDashboardIcon size={18} /> },
     { path: '/gateways', label: 'Gateways', icon: <GatewayIcon size={18} /> },
     { path: '/alarms', label: 'Alarms', icon: <NavAlarmsIcon size={18} /> },
     { path: '/trends', label: 'Trends', icon: <TrendsIcon size={18} /> },
     { path: '/reports', label: 'Reports', icon: <ReportsIcon size={18} /> },
+    { path: '/users', label: 'Users', icon: <UsersIcon size={18} />, adminOnly: true },
     { path: '/settings', label: 'Settings', icon: <NavSettingsIcon size={18} /> },
-  ]
+  ].filter((i) => !i.adminOnly || canManageUsers)
   // Mobile bottom bar shows the 5 most-used destinations
-  const mobileNav = navItems.filter(i => i.path !== '/reports')
+  const mobileNav = navItems.filter((i) => i.path !== '/reports' && i.path !== '/users')
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">

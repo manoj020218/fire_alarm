@@ -2,30 +2,24 @@
  * Settings page — profile, subscription/site, notification preferences, and
  * (for CLIENT_ADMIN+) team member management. Reuses the approved kit.
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
-import type { SubscriptionInfo, SubscriptionResponse, UserItem, UsersResponse } from '../lib/types'
-import axios from 'axios'
+import type { SubscriptionInfo, SubscriptionResponse } from '../lib/types'
 
 import AppShell from '../components/ui/AppShell'
 import SectionCard from '../components/ui/SectionCard'
 import Button from '../components/ui/Button'
-import Input from '../components/ui/Input'
-import Dropdown from '../components/ui/Dropdown'
 import Toggle from '../components/ui/Toggle'
 import StatusBadge from '../components/ui/StatusBadge'
 import type { Status } from '../lib/utils'
 
-const isAdmin = (role?: string) =>
-  role === 'CLIENT_ADMIN' || role === 'VENDOR_ADMIN' || role === 'JENIX_SUPER_ADMIN'
-
 const ROLE_LABEL: Record<string, string> = {
   JENIX_SUPER_ADMIN: 'Super Admin',
   VENDOR_ADMIN: 'Vendor Admin',
-  CLIENT_ADMIN: 'Client Admin',
-  MAINTENANCE_USER: 'Maintenance',
+  CLIENT_ADMIN: 'Admin',
+  MAINTENANCE_USER: 'Member',
   VIEWER: 'Viewer',
 }
 
@@ -40,120 +34,24 @@ function subStatus(s?: SubscriptionInfo['status']): Status {
   return 'idle'
 }
 
-// ── Add-user modal ───────────────────────────────────────────────────────────
-function AddUserModal({ siteId, onClose, onAdded }: { siteId: string | null; onClose: () => void; onAdded: (u: UserItem) => void }) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [role, setRole] = useState('VIEWER')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function submit() {
-    setError(null)
-    if (!name.trim() || !email.trim() || password.length < 8) {
-      setError('Enter a name, a valid email, and a password of at least 8 characters.')
-      return
-    }
-    setBusy(true)
-    try {
-      const res = await api.post<{ ok: boolean; user: UserItem }>('/users', {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        password,
-        role,
-        siteIds: siteId ? [siteId] : [],
-      })
-      onAdded(res.data.user)
-    } catch (err: unknown) {
-      setError(
-        axios.isAxiosError(err) && err.response?.data?.error
-          ? String(err.response.data.error)
-          : 'Could not create this user.'
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-        <h3 className="text-base font-bold text-slate-800 mb-4">Add team member</h3>
-        <div className="space-y-3">
-          <Input label="Full name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <Input label="Temporary password" type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="min 8 characters" />
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Role</label>
-            <Dropdown
-              options={[
-                { value: 'VIEWER', label: 'Viewer — read only' },
-                { value: 'MAINTENANCE_USER', label: 'Maintenance — acknowledge alarms' },
-                { value: 'CLIENT_ADMIN', label: 'Client Admin — full access' },
-              ]}
-              value={role}
-              onChange={setRole}
-            />
-          </div>
-        </div>
-        {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3">{error}</p>}
-        <div className="flex gap-2 mt-5">
-          <Button variant="secondary" size="md" className="flex-1 justify-center" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button variant="primary" size="md" className="flex-1 justify-center" loading={busy} onClick={() => void submit()}>Create user</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Settings() {
   const navigate = useNavigate()
   const { user, siteId, logout } = useAuth()
-  const admin = isAdmin(user?.role)
 
   const [sub, setSub] = useState<SubscriptionInfo | null>(null)
   const [prefs, setPrefs] = useState<NotifPrefs>(() => {
     try { return { ...defaultPrefs, ...JSON.parse(localStorage.getItem(NOTIF_KEY) ?? '{}') } } catch { return defaultPrefs }
   })
-  const [users, setUsers] = useState<UserItem[]>([])
-  const [usersLoading, setUsersLoading] = useState(admin)
-  const [showAddUser, setShowAddUser] = useState(false)
 
   useEffect(() => {
     void api.get<SubscriptionResponse>('/subscription').then((r) => setSub(r.data.subscription)).catch(() => {})
   }, [])
 
-  const fetchUsers = useCallback(async () => {
-    if (!admin) return
-    try {
-      const res = await api.get<UsersResponse>('/users', { params: siteId ? { siteId } : {} })
-      setUsers(res.data.users)
-    } catch {
-      /* non-fatal */
-    } finally {
-      setUsersLoading(false)
-    }
-  }, [admin, siteId])
-
-  useEffect(() => { void fetchUsers() }, [fetchUsers])
-
   function setPref(key: keyof NotifPrefs, val: boolean) {
     const next = { ...prefs, [key]: val }
     setPrefs(next)
     localStorage.setItem(NOTIF_KEY, JSON.stringify(next))
-  }
-
-  async function removeUser(id: string) {
-    if (!confirm('Remove this team member?')) return
-    const prev = users
-    setUsers((u) => u.filter((x) => (x._id ?? x.id) !== id))
-    try {
-      await api.delete(`/users/${id}`)
-    } catch {
-      setUsers(prev) // revert on failure
-    }
   }
 
   return (
@@ -239,53 +137,12 @@ export default function Settings() {
           </div>
         </SectionCard>
 
-        {/* Team (admins only) */}
-        {admin && (
-          <SectionCard
-            title="Team members"
-            accent="#7C3AED"
-            action={<Button variant="primary" size="sm" onClick={() => setShowAddUser(true)}>+ Add</Button>}
-          >
-            {usersLoading ? (
-              <div className="flex items-center justify-center h-24 text-sm text-slate-500">Loading…</div>
-            ) : users.length === 0 ? (
-              <p className="text-sm text-slate-500 py-6 text-center">No team members yet.</p>
-            ) : (
-              <div className="space-y-1">
-                {users.map((u) => {
-                  const uid = u._id ?? u.id ?? u.email
-                  const isSelf = u.email === user?.email
-                  return (
-                    <div key={uid} className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0">
-                      <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold flex-shrink-0">
-                        {u.name[0]?.toUpperCase() ?? 'U'}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-800 truncate">{u.name}{isSelf && <span className="text-xs text-slate-400"> (you)</span>}</p>
-                        <p className="text-xs text-slate-500 truncate">{u.email}</p>
-                      </div>
-                      <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{ROLE_LABEL[u.role] ?? u.role}</span>
-                      {!isSelf && (
-                        <button onClick={() => void removeUser(uid)} className="text-slate-300 hover:text-red-500 transition-colors" title="Remove">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </SectionCard>
-        )}
+        {/* Team management moved to its own Users tab */}
+        <SectionCard title="Team" accent="#7C3AED">
+          <p className="text-sm text-slate-600 mb-3">Manage who can access this account and their roles.</p>
+          <Button variant="secondary" size="sm" onClick={() => navigate('/users')}>Manage users →</Button>
+        </SectionCard>
       </div>
-
-      {showAddUser && (
-        <AddUserModal
-          siteId={siteId}
-          onClose={() => setShowAddUser(false)}
-          onAdded={(u) => { setShowAddUser(false); setUsers((prev) => [u, ...prev]) }}
-        />
-      )}
     </AppShell>
   )
 }

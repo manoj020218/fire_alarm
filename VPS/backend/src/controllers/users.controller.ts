@@ -10,7 +10,12 @@ import { writeAudit } from '../services/audit.service';
 import { scopeFilter } from '../utils/scope';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
-import type { CreateUserBody, UpdateUserBody, UserQuery } from '../validation/users.schema';
+import type {
+  CreateUserBody,
+  UpdateUserBody,
+  UserQuery,
+  ResetPasswordBody,
+} from '../validation/users.schema';
 
 // ── GET /api/users ────────────────────────────────────────────────────────────
 
@@ -126,6 +131,36 @@ export const updateUser = asyncHandler(async (req: Request, res: Response): Prom
   });
 
   res.json({ ok: true, user });
+});
+
+// ── POST /api/users/:id/reset-password ────────────────────────────────────────
+// Admin sets a new password for a member (e.g. they forgot theirs).
+
+export const resetUserPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as { id: string };
+  const { password } = req.body as ResetPasswordBody;
+
+  const user = await User.findById(id);
+  if (!user) throw AppError.notFound('User');
+
+  // Cannot reset a user whose role is higher than the caller's.
+  if (ROLE_HIERARCHY[user.role] > ROLE_HIERARCHY[req.user.role]) {
+    throw AppError.forbidden('Cannot reset a user with a higher role than your own');
+  }
+
+  const passwordHash = await hashPassword(password);
+  await User.findByIdAndUpdate(id, { $set: { passwordHash } });
+
+  await writeAudit({
+    action: 'UPDATE',
+    entity: 'User',
+    entityId: id,
+    after: { passwordReset: true },
+    req,
+  });
+
+  res.json({ ok: true, message: 'Password reset' });
 });
 
 // ── DELETE /api/users/:id (soft-deactivate) ───────────────────────────────────

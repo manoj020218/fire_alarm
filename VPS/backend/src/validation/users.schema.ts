@@ -23,6 +23,10 @@ export const UserParamsSchema = z.object({
   id: z.string().min(1),
 });
 
+export const ResetPasswordSchema = z.object({
+  password: z.string().min(8, 'Password must be at least 8 chars'),
+});
+
 export const UserQuerySchema = z.object({
   siteId: z.string().optional(),
   role: z.enum(ROLES).optional(),
@@ -37,3 +41,4 @@ export const UserQuerySchema = z.object({
 export type CreateUserBody = z.infer<typeof CreateUserSchema>;
 export type UpdateUserBody = z.infer<typeof UpdateUserSchema>;
 export type UserQuery = z.infer<typeof UserQuerySchema>;
+export type ResetPasswordBody = z.infer<typeof ResetPasswordSchema>;

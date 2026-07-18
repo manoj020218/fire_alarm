@@ -14,6 +14,7 @@ import Gateways from './pages/Gateways'
 import Alarms from './pages/Alarms'
 import Trends from './pages/Trends'
 import Reports from './pages/Reports'
+import Users from './pages/Users'
 import Settings from './pages/Settings'
 import KitGallery from './pages/KitGallery'
 import Login from './pages/Login'
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/alarms" element={<RequireAuth><Alarms /></RequireAuth>} />
         <Route path="/trends" element={<RequireAuth><Trends /></RequireAuth>} />
         <Route path="/reports" element={<RequireAuth><Reports /></RequireAuth>} />
+        <Route path="/users" element={<RequireAuth><Users /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
