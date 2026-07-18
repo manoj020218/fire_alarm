@@ -41,6 +41,8 @@ interface AuthContextValue {
   isAuthenticated: boolean
   /** Returns null on success; error message string on failure. */
   login: (email: string, password: string) => Promise<string | null>
+  /** Sign in with a Google ID token. Returns null on success; error message on failure. */
+  loginWithGoogle: (idToken: string) => Promise<string | null>
   logout: () => void
   /** First siteId from the user's profile (null for super roles with no site). */
   siteId: string | null
@@ -72,6 +74,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const loginWithGoogle = useCallback(async (idToken: string): Promise<string | null> => {
+    try {
+      const { data } = await api.post<LoginResponse>('/auth/google', { idToken })
+      saveSession(data.accessToken, data.refreshToken, data.user)
+      setUser(data.user)
+      return null
+    } catch (err: unknown) {
+      const status =
+        typeof err === 'object' && err !== null && 'response' in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined
+      if (status === 404) {
+        return 'No FireGuard account for this Google email. Please sign up first.'
+      }
+      if (status === 401) {
+        return 'Google sign-in could not be verified. Please try again.'
+      }
+      return 'Google sign-in failed. Please try again.'
+    }
+  }, [])
+
   const logout = useCallback(() => {
     void unregisterPush().finally(() => {
       clearSession()
@@ -83,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const siteId = user?.siteIds?.[0] ?? null
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: user !== null, login, logout, siteId }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: user !== null, login, loginWithGoogle, logout, siteId }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Input from './Input'
 import Button from './Button'
 import Toggle from './Toggle'
@@ -7,9 +7,11 @@ interface Props {
   onLogin?: (email: string, password: string, remember: boolean) => void
   loading?: boolean
   error?: string
+  /** Optional content rendered inside the card, below the form (e.g. social sign-in). */
+  footer?: ReactNode
 }
 
-export default function LoginScreen({ onLogin, loading = false, error }: Props) {
+export default function LoginScreen({ onLogin, loading = false, error, footer }: Props) {
   const [email, setEmail] = useState('admin@abctowers.com')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
@@ -82,6 +84,8 @@ export default function LoginScreen({ onLogin, loading = false, error }: Props) 
               Sign in to FireGuard
             </Button>
           </form>
+
+          {footer}
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-6">

@@ -9,8 +9,8 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../middleware/validate.middleware';
 import { authenticate } from '../middleware/auth.middleware';
-import { LoginSchema, RefreshSchema } from '../validation/auth.schema';
-import { login, refresh, logout, me } from '../controllers/auth.controller';
+import { LoginSchema, RefreshSchema, GoogleLoginSchema } from '../validation/auth.schema';
+import { login, googleLogin, refresh, logout, me } from '../controllers/auth.controller';
 import { env } from '../config/env';
 
 const router = Router();
@@ -24,6 +24,7 @@ const loginLimiter = rateLimit({
 });
 
 router.post('/login', loginLimiter, validate({ body: LoginSchema }), login);
+router.post('/google', loginLimiter, validate({ body: GoogleLoginSchema }), googleLogin);
 router.post('/refresh', validate({ body: RefreshSchema }), refresh);
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, me);

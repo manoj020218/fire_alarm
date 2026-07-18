@@ -27,6 +27,10 @@ const EnvSchema = z.object({
   FCM_SERVER_KEY: z.string().optional(),
   /** Path to a Firebase service-account JSON for FCM HTTP v1 (firebase-admin) */
   FIREBASE_SERVICE_ACCOUNT_FILE: z.string().optional(),
+  /** Google OAuth Web client ID — audience for verifying Sign-In ID tokens */
+  GOOGLE_CLIENT_ID: z
+    .string()
+    .default('1096081783924-etthdttkand490a3s5p2v0g2ip6i9le6.apps.googleusercontent.com'),
   WHATSAPP_API_URL: z.string().url().optional(),
   WHATSAPP_TOKEN: z.string().optional(),
   SMTP_HOST: z.string().optional(),
