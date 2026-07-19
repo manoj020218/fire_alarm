@@ -33,6 +33,7 @@ import {
   rotateDeviceToken,
   claimGateway,
   createPoolGateway,
+  releaseGateway,
 } from '../controllers/gateways.controller';
 
 const router = Router();
@@ -52,6 +53,12 @@ router.post(
   requireRole('JENIX_SUPER_ADMIN'),
   validate({ body: PoolGatewaySchema }),
   createPoolGateway
+);
+router.post(
+  '/:id/release',
+  requireRole('JENIX_SUPER_ADMIN'),
+  validate({ params: GatewayParamsSchema }),
+  releaseGateway
 );
 
 router.get('/', listGateways);

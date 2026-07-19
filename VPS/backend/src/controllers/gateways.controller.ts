@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { Gateway, type IGatewayDocument } from '../models/Gateway';
 import { DeviceConfig } from '../models/DeviceConfig';
+import { Device } from '../models/Device';
 import { Site } from '../models/Site';
 import { env } from '../config/env';
 import { notifyBillingActivation } from '../services/billingBridge';
@@ -323,5 +324,40 @@ export const createPoolGateway = asyncHandler(
     });
 
     res.status(201).json({ ok: true, gatewayId: gwId, claimCode, deviceToken });
+  }
+);
+
+// ── POST /api/gateways/:id/release ───────────────────────────────────────────
+// Super-admin returns a gateway to the claimable pool (e.g. after bench testing,
+// before shipping to a customer). Issues a fresh claim code and clears test data.
+
+export const releaseGateway = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) throw AppError.unauthorized();
+    const { id } = req.params as { id: string };
+
+    const gateway = await Gateway.findOne({ gatewayId: id.toUpperCase() });
+    if (!gateway) throw AppError.notFound('Gateway');
+
+    const claimCode = generateClaimCode();
+    gateway.siteId = 'POOL';
+    gateway.claimed = false;
+    gateway.claimCode = claimCode;
+    gateway.smsConfig = undefined;
+    gateway.sim = undefined;
+    await gateway.save();
+
+    // Deactivate any devices configured during testing so they don't follow the unit.
+    await Device.updateMany({ gatewayId: gateway.gatewayId }, { $set: { active: false } });
+
+    await writeAudit({
+      action: 'UPDATE',
+      entity: 'Gateway',
+      entityId: gateway.gatewayId,
+      after: { released: true, backToPool: true },
+      req,
+    });
+
+    res.json({ ok: true, gatewayId: gateway.gatewayId, claimCode });
   }
 );
