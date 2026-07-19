@@ -29,6 +29,8 @@ export interface SubscriptionInfo {
   siteId?: string
   status: SubscriptionStatus
   daysLeft: number | null
+  /** false = trial hasn't started yet (no gateway activated) */
+  trialStarted?: boolean
 }
 
 export interface SubscriptionResponse {
@@ -215,7 +217,8 @@ export interface SignupSuccess {
   email: string
   tempPassword: string
   loginUrl: string
-  trialEndsAt: string
+  trialEndsAt: string | null
+  trialNote?: string
 }
 
 export interface SignupError {

@@ -116,9 +116,13 @@ export default function Signup() {
                 </div>
               </div>
 
-              {result.trialEndsAt && (
+              {result.trialEndsAt ? (
                 <div className="text-xs text-green-700 bg-green-50 px-3 py-2 rounded-lg">
                   Trial active until {new Date(result.trialEndsAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </div>
+              ) : (
+                <div className="text-xs text-indigo-700 bg-indigo-50 px-3 py-2 rounded-lg">
+                  {result.trialNote ?? 'Your 3-month free trial starts when you add your first gateway.'}
                 </div>
               )}
             </div>

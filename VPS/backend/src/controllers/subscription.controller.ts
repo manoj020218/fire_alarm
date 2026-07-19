@@ -15,7 +15,7 @@ export const getSubscription = asyncHandler(async (req: Request, res: Response):
 
   // Super roles have no site restriction — report 'active' with no countdown
   if (req.user.role === 'JENIX_SUPER_ADMIN' || req.user.role === 'VENDOR_ADMIN') {
-    res.json({ ok: true, subscription: { status: 'active', daysLeft: null } });
+    res.json({ ok: true, subscription: { status: 'active', daysLeft: null, trialStarted: true } });
     return;
   }
 
@@ -37,6 +37,7 @@ export const getSubscription = asyncHandler(async (req: Request, res: Response):
       siteId,
       status: state.status,
       daysLeft: state.daysLeft,
+      trialStarted: state.trialStarted,
     },
   });
 });

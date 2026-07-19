@@ -54,7 +54,9 @@ export const provision = asyncHandler(async (req: Request, res: Response): Promi
     }
   }
 
-  const trialEndsAtDate = new Date(trialEndsAt);
+  // Trial clock is NOT started at signup — it begins when the first gateway is
+  // activated (claimed). Only set trialEndsAt if billing explicitly sent one (legacy).
+  const trialEndsAtDate = trialEndsAt ? new Date(trialEndsAt) : undefined;
 
   // Create the Site
   const site = await Site.create({
@@ -64,7 +66,7 @@ export const provision = asyncHandler(async (req: Request, res: Response): Promi
     timezone: 'Asia/Kolkata',
     active: true,
     subscription: 'trial',
-    trialEndsAt: trialEndsAtDate,
+    ...(trialEndsAtDate ? { trialEndsAt: trialEndsAtDate } : {}),
     graceDays: 15,
   });
 

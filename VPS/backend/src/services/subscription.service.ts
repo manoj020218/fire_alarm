@@ -10,6 +10,8 @@ export interface SubscriptionState {
   status: SubscriptionStatus;
   /** Days remaining (positive = still time; negative or 0 = expired/overdue). null when active/suspended (no countdown). */
   daysLeft: number | null;
+  /** false = trial not yet started (no gateway activated). true once counting or on a paid/expired plan. */
+  trialStarted: boolean;
 }
 
 /**
@@ -28,19 +30,19 @@ export function getSubscriptionState(site: ISite): SubscriptionState {
 
   // Platform-managed statuses — pass through unchanged
   if (subscription === 'active') {
-    return { status: 'active', daysLeft: null };
+    return { status: 'active', daysLeft: null, trialStarted: true };
   }
   if (subscription === 'suspended') {
-    return { status: 'suspended', daysLeft: null };
+    return { status: 'suspended', daysLeft: null, trialStarted: true };
   }
   if (subscription === 'expired') {
-    return { status: 'expired', daysLeft: 0 };
+    return { status: 'expired', daysLeft: 0, trialStarted: true };
   }
 
   // 'trial' path
   if (!trialEndsAt) {
-    // No end date set yet — treat as active trial, no countdown
-    return { status: 'trial', daysLeft: null };
+    // Trial has not started yet — no gateway activated. No countdown, no block.
+    return { status: 'trial', daysLeft: null, trialStarted: false };
   }
 
   const now = Date.now();
@@ -50,7 +52,7 @@ export function getSubscriptionState(site: ISite): SubscriptionState {
   if (now <= trialEnd) {
     // Still within trial window
     const daysLeft = Math.ceil((trialEnd - now) / (24 * 60 * 60 * 1000));
-    return { status: 'trial', daysLeft };
+    return { status: 'trial', daysLeft, trialStarted: true };
   }
 
   if (now <= graceEnd) {
@@ -58,9 +60,9 @@ export function getSubscriptionState(site: ISite): SubscriptionState {
     // daysLeft = 0 (at grace boundary) to trigger a strong warning.
     // We keep status 'trial' so the gate does not block yet.
     const daysLeft = Math.ceil((graceEnd - now) / (24 * 60 * 60 * 1000));
-    return { status: 'trial', daysLeft };
+    return { status: 'trial', daysLeft, trialStarted: true };
   }
 
   // Both trial and grace have expired
-  return { status: 'expired', daysLeft: 0 };
+  return { status: 'expired', daysLeft: 0, trialStarted: true };
 }

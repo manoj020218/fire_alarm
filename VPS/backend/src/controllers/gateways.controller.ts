@@ -5,6 +5,9 @@ import type { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { Gateway, type IGatewayDocument } from '../models/Gateway';
 import { DeviceConfig } from '../models/DeviceConfig';
+import { Site } from '../models/Site';
+import { env } from '../config/env';
+import { notifyBillingActivation } from '../services/billingBridge';
 import { writeAudit } from '../services/audit.service';
 import { publishGatewayConfig, publishGatewayCommand } from '../services/deviceCommand.service';
 import { scopeFilter, canAccessSite } from '../utils/scope';
@@ -219,6 +222,23 @@ export const claimGateway = asyncHandler(
     gateway.claimCode = undefined;
     if (name) gateway.name = name;
     await gateway.save();
+
+    // Start the free trial on first activation: if the site is on 'trial' with no
+    // clock yet, this claim begins the countdown. Notify billing (best-effort).
+    const site = await Site.findOne({ siteId: targetSite });
+    if (site && site.subscription === 'trial' && !site.trialEndsAt) {
+      const trialEndsAt = new Date(Date.now() + env.TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      site.trialEndsAt = trialEndsAt;
+      await site.save();
+      void notifyBillingActivation(targetSite, trialEndsAt);
+      await writeAudit({
+        action: 'UPDATE',
+        entity: 'Site',
+        entityId: targetSite,
+        after: { trialStarted: true, trialEndsAt: trialEndsAt.toISOString() },
+        req,
+      });
+    }
 
     await writeAudit({
       action: 'GATEWAY_CLAIM',

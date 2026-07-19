@@ -100,6 +100,16 @@ function StatusIcon({ status }: { status: Status }) {
 function SubscriptionBanner({ sub }: { sub: SubscriptionInfo }) {
   if (sub.status === 'active') return null
 
+  // Trial hasn't started yet — starts when the first gateway is activated.
+  if (sub.status === 'trial' && sub.trialStarted === false) {
+    return (
+      <div className="mb-5 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-sm text-indigo-800 flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/></svg>
+        <span>Your <strong>3-month free trial</strong> starts as soon as you add your first gateway.</span>
+      </div>
+    )
+  }
+
   if (sub.status === 'trial' && sub.daysLeft !== null) {
     return (
       <div className="mb-5 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-sm text-indigo-800 flex items-center justify-between">

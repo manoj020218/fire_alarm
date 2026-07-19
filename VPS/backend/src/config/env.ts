@@ -50,6 +50,8 @@ const EnvSchema = z.object({
   // ── Billing bridge ────────────────────────────────────────────────────────
   BRIDGE_SECRET: z.string().min(16, 'BRIDGE_SECRET must be at least 16 chars').default('dev-bridge-secret-change-in-prod'),
   BILLING_BASE: z.string().url('BILLING_BASE must be a valid URL').default('https://iotsoft.in'),
+  /** Free-trial length in days — clock starts when the first gateway is activated */
+  TRIAL_DAYS: z.coerce.number().int().min(1).max(365).default(90),
   APP_LOGIN_URL: z.string().url('APP_LOGIN_URL must be a valid URL').default('https://fireguard.iotsoft.in/app'),
 });
 
