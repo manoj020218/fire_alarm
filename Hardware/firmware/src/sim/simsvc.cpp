@@ -59,10 +59,11 @@ static void doTestSms() {
     DynamicJsonDocument doc(512);
     doc["type"] = "test_sms";
     if (!s_number[0]) { doc["ok"] = false; doc["error"] = "no number"; publishSim(doc); return; }
-    bool ok = modem4g_send_sms(s_number, "FireGuard: SIM test SMS. If you received this, SMS alerts are working.");
+    String err = modem4g_send_sms_diag(s_number, "FireGuard: SIM test SMS. If you received this, SMS alerts are working.");
+    bool ok = (err.length() == 0);
     doc["ok"]      = ok;
     doc["canSend"] = ok;
-    if (!ok) doc["error"] = "send failed (check registration / balance)";
+    if (!ok) doc["error"] = err;   // exact +CMS ERROR code from the modem
     publishSim(doc);
 }
 

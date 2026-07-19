@@ -83,8 +83,16 @@ Modem4gState modem4g_step(const char* apn) {
         if (s_modem.testAT(1500)) {
             s_modem.sendAT(GF("+CMEE=2"));
             s_modem.waitResponse(500);
+            // Operator-agnostic: automatic network mode (works for JIO/Airtel/VI/BSNL —
+            // modem picks 2G/3G/4G as available) + enable VoLTE (needed for SMS/calls on
+            // LTE-only JIO, harmless on others). Explicitly setting auto also clears any
+            // stale saved mode that could block registration.
+            s_modem.sendAT(GF("+CNMP=2"));    // 2 = automatic (all RATs)
+            s_modem.waitResponse(3000);
+            s_modem.sendAT(GF("+CVOLTE=1"));  // enable VoLTE (SMS/calls over IMS)
+            s_modem.waitResponse(3000);
             s_netDeadline = millis() + WAIT_NETWORK_TOTAL_MS;
-            LOG_I("4G", "AT OK — waiting for network registration");
+            LOG_I("4G", "AT OK, auto-mode+VoLTE set — waiting for registration");
             enter(Modem4gState::WAIT_NETWORK);
         } else if (elapsed() > WAIT_AT_TIMEOUT_MS) {
             LOG_W("4G", "No AT response — scheduling retry");
@@ -278,6 +286,35 @@ String modem4g_read_sms_raw() {
     s_modem.waitResponse(8000, res);
     esp_task_wdt_reset();
     return res;
+}
+
+String modem4g_send_sms_diag(const char* number, const char* text) {
+    if (!number || !number[0]) return "no number";
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CMGF=1"));                  // text mode
+    s_modem.waitResponse(1000);
+    s_modem.sendAT(GF("+CSMP=17,167,0,0"));         // standard SMS params
+    s_modem.waitResponse(1000);
+    String cmd = "+CMGS=\"";
+    cmd += number;
+    cmd += "\"";
+    s_modem.sendAT(cmd.c_str());
+    if (s_modem.waitResponse(5000, GF(">")) != 1) {
+        return "no > prompt (SMS not ready)";
+    }
+    s_modem.stream.print(text);
+    s_modem.stream.write((char)0x1A);              // Ctrl-Z sends the message
+    s_modem.stream.flush();
+    String resp;
+    int r = s_modem.waitResponse(60000L, resp);
+    esp_task_wdt_reset();
+    if (r == 1) return "";                          // OK / +CMGS ref = success
+    int p = resp.indexOf("+CMS ERROR");
+    if (p >= 0) {
+        int end = resp.indexOf('\r', p);
+        return resp.substring(p, end < 0 ? resp.length() : end);
+    }
+    return "send failed (no CMS code)";
 }
 
 Client* modem4g_get_client() { return &s_client; }

@@ -47,6 +47,8 @@ int    modem4g_signal_csq();                  // 0-31 (99 = unknown)
 String modem4g_own_number();                  // AT+CNUM (often blank — operator-dependent)
 String modem4g_ussd(const char* code);        // AT+CUSD balance/validity → raw text
 String modem4g_read_sms_raw();                // AT+CMGL="ALL" text-mode dump
+// Send SMS and return "" on success, or the exact error (e.g. "+CMS ERROR: 331").
+String modem4g_send_sms_diag(const char* number, const char* text);
 
 // Access the underlying TinyGSM client (owned by uplink module)
 class Client;

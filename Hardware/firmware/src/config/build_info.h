@@ -5,7 +5,7 @@
 // RELEASE_DATE in ISO-8601.  PID kept as-is for cloud compat.
 // ============================================================
 
-#define FW_VERSION    "1.0.0"
-#define RELEASE_DATE  "2026-07-14"
+#define FW_VERSION    "1.0.1"
+#define RELEASE_DATE  "2026-07-19"
 #define PRODUCT_ID    "FIREGUARD-S3-01"   // legacy PID, kept for backend compat
 #define HW_REVISION   "vvm401"
