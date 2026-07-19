@@ -66,9 +66,9 @@ static void dispatch_command(const char* cmdJson, unsigned int len) {
     // Other commands (reboot / sync_time / test_alarm) can be added here.
 }
 
-// Apply pushed config from config/set — currently SMS alert numbers + operator.
+// Apply pushed config from config/set — SMS alert numbers/operator + register map.
 static void dispatch_config(const char* json, unsigned int len) {
-    StaticJsonDocument<512> doc;
+    DynamicJsonDocument doc(4096);   // register maps can hold up to 32 devices
     if (deserializeJson(doc, json, len) != DeserializationError::Ok) return;
 
     JsonVariantConst sms = doc["customSettings"]["sms"];
@@ -77,6 +77,11 @@ static void dispatch_config(const char* json, unsigned int len) {
         bool enabled        = sms["enabled"] | false;
         config_set_sms(numbers, enabled);
         LOG_I("MQTT", "config/set: SMS updated (enabled=%d)", enabled ? 1 : 0);
+    }
+
+    JsonArrayConst regs = doc["customSettings"]["registers"];
+    if (!regs.isNull()) {
+        config_set_registers(regs);
     }
 }
 

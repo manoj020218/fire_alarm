@@ -5,6 +5,7 @@
 // WebUI + MQTT config/set can override at runtime.
 // ============================================================
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include "defaults.h"
 
 // Maximum number of Modbus register map entries
@@ -102,3 +103,5 @@ void config_save();                     // struct → NVS
 void config_reset_to_defaults();        // factory reset (clears NVS namespace)
 void config_derive_gateway_id();        // build "JNX-FG-XXXX" from MAC if blank
 void config_set_sms(const char* numbers, bool enabled);  // apply pushed SMS config + persist
+// Apply a pushed Modbus register map (config/set customSettings.registers) + persist.
+void config_set_registers(JsonArrayConst regs);

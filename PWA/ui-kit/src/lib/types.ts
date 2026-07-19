@@ -92,6 +92,37 @@ export interface SimEvent extends GatewaySim {
   at?: string
 }
 
+// ── Devices (Modbus register map) ───────────────────────────────────────────────
+
+export type DeviceType =
+  | 'pump' | 'pressure_sensor' | 'level_sensor' | 'voltage_sensor' | 'fire_panel'
+  | 'pa_system' | 'ventilation' | 'valve' | 'digital_input' | 'digital_output'
+
+export interface DeviceModbus {
+  slaveId: number
+  fc: 1 | 2 | 3 | 4
+  regAddr: number
+  scale: number
+  unit: string
+}
+
+export interface DeviceItem {
+  _id?: string
+  deviceId: string
+  gatewayId: string
+  siteId: string
+  type: DeviceType
+  label: string
+  unit?: string
+  active: boolean
+  modbus?: DeviceModbus
+}
+
+export interface DevicesResponse {
+  ok: boolean
+  devices: DeviceItem[]
+}
+
 export interface GatewaysResponse {
   ok: boolean
   gateways: GatewayItem[]

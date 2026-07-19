@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import { Device } from '../models/Device';
 import { Gateway } from '../models/Gateway';
 import { writeAudit } from '../services/audit.service';
+import { publishGatewayConfig } from '../services/deviceCommand.service';
 import { canAccessSite } from '../utils/scope';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -15,6 +16,27 @@ async function resolveGateway(gatewayId: string, caller: NonNullable<Request['us
   if (!gw) throw AppError.notFound('Gateway');
   if (!canAccessSite(caller, gw.siteId)) throw AppError.forbidden();
   return gw;
+}
+
+/**
+ * Build the active Modbus register map for a gateway and push it via config/set
+ * so the device knows exactly what to poll. Called after every device mutation.
+ */
+async function pushDeviceMap(gatewayId: string, siteId: string): Promise<void> {
+  const devices = await Device.find({ gatewayId, active: true }).sort({ deviceId: 1 });
+  const registers = devices
+    .filter((d) => d.modbus)
+    .map((d) => ({
+      tag: d.deviceId,
+      slaveId: d.modbus!.slaveId,
+      fc: d.modbus!.fc,
+      regAddr: d.modbus!.regAddr,
+      count: 1,
+      scale: d.modbus!.scale,
+      unit: d.modbus!.unit,
+      enabled: true,
+    }));
+  publishGatewayConfig(gatewayId, siteId, { customSettings: { registers } });
 }
 
 // ── GET /api/gateways/:gatewayId/devices ──────────────────────────────────────
@@ -53,6 +75,7 @@ export const createDevice = asyncHandler(async (req: Request, res: Response): Pr
   const gw = await resolveGateway(gatewayId, req.user);
 
   const device = await Device.create({ ...body, gatewayId, siteId: gw.siteId });
+  await pushDeviceMap(gatewayId, gw.siteId);
 
   await writeAudit({
     action: 'CREATE',
@@ -82,6 +105,7 @@ export const updateDevice = asyncHandler(async (req: Request, res: Response): Pr
     { $set: body },
     { new: true }
   );
+  await pushDeviceMap(gatewayId, before.siteId);
 
   await writeAudit({
     action: 'UPDATE',
@@ -107,6 +131,7 @@ export const deleteDevice = asyncHandler(async (req: Request, res: Response): Pr
   if (!device) throw AppError.notFound('Device');
 
   await Device.findOneAndUpdate({ gatewayId, deviceId }, { $set: { active: false } });
+  await pushDeviceMap(gatewayId, device.siteId);
 
   await writeAudit({
     action: 'DELETE',

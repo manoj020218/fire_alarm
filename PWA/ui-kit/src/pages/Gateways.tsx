@@ -16,6 +16,7 @@ import SectionCard from '../components/ui/SectionCard'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import GatewayPanel from '../components/ui/GatewayPanel'
+import DevicesPanel from '../components/ui/DevicesPanel'
 import GatewayIcon from '../components/icons/GatewayIcon'
 
 const isAdmin = (role?: string) =>
@@ -130,7 +131,7 @@ function AddGatewayModal({
 }
 
 // ── Gateway card ────────────────────────────────────────────────────────────
-function GatewayCard({ gw, canManage, onManage }: { gw: GatewayItem; canManage: boolean; onManage: () => void }) {
+function GatewayCard({ gw, canManage, onManage, onDevices }: { gw: GatewayItem; canManage: boolean; onManage: () => void; onDevices: () => void }) {
   return (
     <div className="border border-slate-200 rounded-xl p-4 bg-white hover:shadow-sm transition-shadow">
       <div className="flex items-start gap-3">
@@ -154,9 +155,14 @@ function GatewayCard({ gw, canManage, onManage }: { gw: GatewayItem; canManage: 
         <div className="flex justify-between"><span>Uptime</span><span className="font-medium text-slate-800">{gw.uptime != null ? formatUptime(gw.uptime) : '—'}</span></div>
         <div className="flex justify-between"><span>SMS alerts</span><span className={`font-medium ${gw.smsConfig?.enabled ? 'text-emerald-600' : 'text-slate-400'}`}>{gw.smsConfig?.enabled ? 'On' : 'Off'}</span></div>
       </div>
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between gap-2">
         <span className={`text-[11px] ${gw.online ? 'text-green-600' : 'text-red-500'}`}>Last seen {formatLastSeen(gw.lastSeenAt)}</span>
-        {canManage && <Button variant="secondary" size="sm" onClick={onManage}>SMS &amp; SIM</Button>}
+        {canManage && (
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={onDevices}>Devices</Button>
+            <Button variant="secondary" size="sm" onClick={onManage}>SMS &amp; SIM</Button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -191,6 +197,7 @@ export default function Gateways() {
   const [error, setError] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [managing, setManaging] = useState<GatewayItem | null>(null)
+  const [devicesFor, setDevicesFor] = useState<GatewayItem | null>(null)
   const canAdd = isAdmin(user?.role)
 
   const fetchGateways = useCallback(async () => {
@@ -252,7 +259,7 @@ export default function Gateways() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {gateways.map((gw) => (
-            <GatewayCard key={gw.gatewayId} gw={gw} canManage={canAdd} onManage={() => setManaging(gw)} />
+            <GatewayCard key={gw.gatewayId} gw={gw} canManage={canAdd} onManage={() => setManaging(gw)} onDevices={() => setDevicesFor(gw)} />
           ))}
         </div>
       )}
@@ -268,6 +275,8 @@ export default function Gateways() {
           }}
         />
       )}
+
+      {devicesFor && <DevicesPanel gateway={devicesFor} onClose={() => setDevicesFor(null)} />}
 
       {showAdd && (
         <AddGatewayModal

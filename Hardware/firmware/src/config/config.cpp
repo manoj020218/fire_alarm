@@ -157,3 +157,24 @@ void config_set_sms(const char* numbers, bool enabled) {
     s_cfg.smsEnabled = enabled;
     config_save();
 }
+
+// Apply a pushed Modbus register map (from config/set customSettings.registers).
+void config_set_registers(JsonArrayConst regs) {
+    uint8_t n = 0;
+    for (JsonObjectConst r : regs) {
+        if (n >= CONFIG_MAX_REGISTERS) break;
+        ModbusRegEntry& e = s_cfg.regs[n];
+        e.slaveId = (uint8_t)(r["slaveId"] | 1);
+        e.fc      = (uint8_t)(r["fc"]      | 3);
+        e.regAddr = (uint16_t)(r["regAddr"] | 0);
+        e.count   = (uint8_t)(r["count"]   | 1);
+        e.scale   = (float)(r["scale"]     | 1.0);
+        e.enabled = r["enabled"] | true;
+        strlcpy(e.unit, r["unit"] | "raw", sizeof(e.unit));
+        strlcpy(e.tag,  r["tag"]  | "",    sizeof(e.tag));
+        n++;
+    }
+    s_cfg.regCount = n;
+    config_save();
+    LOG_I("CFG", "config/set: register map updated (%d devices)", n);
+}
