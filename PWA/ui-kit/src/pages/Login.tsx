@@ -10,8 +10,11 @@ import { useAuth } from '../lib/auth'
 import LoginScreen from '../components/ui/LoginScreen'
 import GoogleSignInButton from '../components/ui/GoogleSignInButton'
 
-// Public OAuth web client ID (safe to ship).
-const GOOGLE_CLIENT_ID = '1096081783924-etthdttkand490a3s5p2v0g2ip6i9le6.apps.googleusercontent.com'
+// Public OAuth web client ID (safe to ship). Override per-deployment with
+// VITE_GOOGLE_CLIENT_ID at build time (e.g. a client VPS with its own Google project).
+const GOOGLE_CLIENT_ID =
+  ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_GOOGLE_CLIENT_ID) ||
+  '1096081783924-etthdttkand490a3s5p2v0g2ip6i9le6.apps.googleusercontent.com'
 
 export default function Login() {
   const navigate = useNavigate()

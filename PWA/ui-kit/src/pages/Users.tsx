@@ -132,7 +132,8 @@ function AddMemberModal({
 // ── Credentials panel (shown once, after creating a member) ───────────────────
 function CredentialsCard({ creds, onDone }: { creds: Created; onDone: () => void }) {
   const [copied, setCopied] = useState(false)
-  const text = `FireGuard login\nURL: https://fireguard.iotsoft.in/app\nEmail: ${creds.email}\nPassword: ${creds.password}`
+  const appUrl = `${window.location.origin}/app`
+  const text = `FireGuard login\nURL: ${appUrl}\nEmail: ${creds.email}\nPassword: ${creds.password}`
   async function copy() {
     try {
       await navigator.clipboard.writeText(text)
