@@ -213,4 +213,71 @@ bool modem4g_send_sms(const char* number, const char* text) {
     return ok;
 }
 
+// ── SIM / cellular info ───────────────────────────────────────────────────────
+// NOTE: raw-AT parsers (CNUM/CUSD/CMGL) can vary by modem firmware — verify on
+// the actual A7672 and tweak the substring parsing if a field comes back empty.
+
+String modem4g_iccid() {
+    esp_task_wdt_reset();
+    String v = s_modem.getSimCCID();
+    esp_task_wdt_reset();
+    return v;
+}
+
+String modem4g_imsi() {
+    esp_task_wdt_reset();
+    String v = s_modem.getIMSI();
+    esp_task_wdt_reset();
+    return v;
+}
+
+int modem4g_signal_csq() {
+    return s_modem.getSignalQuality();
+}
+
+String modem4g_own_number() {
+    String res;
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CNUM"));
+    if (s_modem.waitResponse(3000, res) != 1) return "";
+    esp_task_wdt_reset();
+    // +CNUM: "name","+9198XXXXXXXX",129
+    int p = res.indexOf("+CNUM:");
+    if (p < 0) return "";
+    int c = res.indexOf(',', p);                  // after the name field
+    int q1 = res.indexOf('"', c);
+    int q2 = res.indexOf('"', q1 + 1);
+    if (q1 < 0 || q2 < 0) return "";
+    return res.substring(q1 + 1, q2);
+}
+
+String modem4g_ussd(const char* code) {
+    if (!code || !code[0]) return "";
+    String res;
+    esp_task_wdt_reset();
+    String at = "+CUSD=1,\"";
+    at += code;
+    at += "\",15";
+    s_modem.sendAT(at.c_str());
+    // USSD reply arrives as an unsolicited +CUSD: line — wait for it.
+    s_modem.waitResponse(15000, res, GF("+CUSD:"));
+    esp_task_wdt_reset();
+    // +CUSD: 0,"Your balance is Rs 50 ...",15  → extract the quoted text
+    int q1 = res.indexOf('"');
+    int q2 = res.lastIndexOf('"');
+    if (q1 >= 0 && q2 > q1) return res.substring(q1 + 1, q2);
+    return res;
+}
+
+String modem4g_read_sms_raw() {
+    String res;
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CMGF=1"));                 // text mode
+    s_modem.waitResponse(1000);
+    s_modem.sendAT(GF("+CMGL=\"ALL\""));
+    s_modem.waitResponse(8000, res);
+    esp_task_wdt_reset();
+    return res;
+}
+
 Client* modem4g_get_client() { return &s_client; }

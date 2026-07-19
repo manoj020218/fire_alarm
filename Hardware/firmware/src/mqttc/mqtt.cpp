@@ -13,6 +13,7 @@
 #include "../config/defaults.h"
 #include "../ota/ota.h"
 #include "../alarms/engine.h"
+#include "../sim/simsvc.h"
 #include "../util/log.h"
 #include "../util/health.h"
 #include "../util/scheduler.h"
@@ -41,15 +42,42 @@ static void dispatch_ota_cmd(const char* cmdJson, unsigned int len) {
 }
 
 static void dispatch_command(const char* cmdJson, unsigned int len) {
-    StaticJsonDocument<128> doc;
+    StaticJsonDocument<256> doc;
     if (deserializeJson(doc, cmdJson, len) != DeserializationError::Ok) return;
 
+    // Legacy in-band ack support
     const char* type = doc["type"] | "";
     if (strcmp(type, "ack") == 0) {
         const char* tag = doc["tag"] | "";
         if (tag[0]) alarms_ack(tag);
+        return;
     }
-    // Additional commands can be added here
+
+    // Backend sends { command, params, issuedAt }
+    const char* command = doc["command"] | "";
+    if (!command[0]) return;
+
+    if (strcmp(command, "sim_info") == 0 || strcmp(command, "read_sms") == 0 ||
+        strcmp(command, "ussd")     == 0 || strcmp(command, "test_sms") == 0) {
+        const char* code   = doc["params"]["code"]   | "";
+        const char* number = doc["params"]["number"] | "";
+        simsvc_request(command, code, number);      // runs in the main loop
+    }
+    // Other commands (reboot / sync_time / test_alarm) can be added here.
+}
+
+// Apply pushed config from config/set — currently SMS alert numbers + operator.
+static void dispatch_config(const char* json, unsigned int len) {
+    StaticJsonDocument<512> doc;
+    if (deserializeJson(doc, json, len) != DeserializationError::Ok) return;
+
+    JsonVariantConst sms = doc["customSettings"]["sms"];
+    if (!sms.isNull()) {
+        const char* numbers = sms["numbers"] | "";
+        bool enabled        = sms["enabled"] | false;
+        config_set_sms(numbers, enabled);
+        LOG_I("MQTT", "config/set: SMS updated (enabled=%d)", enabled ? 1 : 0);
+    }
 }
 
 // --- Internal MQTT callback ----------------------------------
@@ -57,15 +85,17 @@ static void on_message(char* topic, byte* payload, unsigned int len) {
     LOG_I("MQTT", "RX topic=%s len=%u", topic, len);
     if (s_userCb) s_userCb(topic, payload, len);
 
-    // OTA topic dispatch
+    // Topic dispatch
     String otaTopic = topic_ota();
     String cmdTopic = topic_command();
+    String cfgTopic = topic_config_set();
     if (strcmp(topic, otaTopic.c_str()) == 0) {
         dispatch_ota_cmd((const char*)payload, len);
     } else if (strcmp(topic, cmdTopic.c_str()) == 0) {
         dispatch_command((const char*)payload, len);
+    } else if (strcmp(topic, cfgTopic.c_str()) == 0) {
+        dispatch_config((const char*)payload, len);
     }
-    // config/set handled by external callback if registered
 }
 
 // --- Subscribe all inbound topics ----------------------------

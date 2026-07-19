@@ -27,8 +27,28 @@ export const GatewayConfigSchema = z.object({
 });
 
 export const GatewayCommandSchema = z.object({
-  command: z.enum(['reboot', 'sync_time', 'force_mqtt_reconnect', 'test_alarm']),
+  command: z.enum([
+    'reboot',
+    'sync_time',
+    'force_mqtt_reconnect',
+    'test_alarm',
+    // SIM / cellular commands (gateway replies on the /sim topic)
+    'sim_info',
+    'read_sms',
+    'ussd',
+    'test_sms',
+  ]),
   params: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** PUT /api/gateways/:id/sms — SMS alerting + operator config. */
+export const SmsConfigSchema = z.object({
+  enabled: z.boolean(),
+  // comma-separated E.164 numbers; allow empty when disabling
+  numbers: z.string().max(400).default(''),
+  operator: z.enum(['airtel', 'jio', 'vi', 'bsnl', 'custom']).optional(),
+  balanceUssd: z.string().max(20).optional(),
+  numberUssd: z.string().max(20).optional(),
 });
 
 // ── Add-Gateway (claim) ────────────────────────────────────────────────────────
@@ -51,3 +71,4 @@ export type GatewayConfigBody = z.infer<typeof GatewayConfigSchema>;
 export type GatewayCommandBody = z.infer<typeof GatewayCommandSchema>;
 export type ClaimGatewayBody = z.infer<typeof ClaimGatewaySchema>;
 export type PoolGatewayBody = z.infer<typeof PoolGatewaySchema>;
+export type SmsConfigBody = z.infer<typeof SmsConfigSchema>;

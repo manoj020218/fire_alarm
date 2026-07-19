@@ -19,6 +19,7 @@ import {
   emitTelemetry,
   emitAlarm,
   emitGatewayStatus,
+  emitSim,
 } from '../socket/socketServer';
 
 // ─── Zod schemas (tolerant of extra device keys via .passthrough()) ───────────
@@ -102,6 +103,8 @@ export async function handleMqttMessage(topic: string, payload: Buffer): Promise
       await handleStatus(payload);
     } else if (suffix === 'alarm') {
       await handleAlarm(payload);
+    } else if (suffix === 'sim') {
+      await handleSim(parts[1] ?? '', parts[2] ?? '', payload);
     }
     // Ignore config/set, command, ota — those are server→device topics
   } catch (err) {
@@ -296,5 +299,64 @@ export async function handleAlarm(
     }
   } catch (err) {
     logger.error({ err, alarmId: d.alarmId }, 'Failed to persist alarm');
+  }
+}
+
+// ─── SIM / cellular response handler ──────────────────────────────────────────
+// Gateway replies on fireguard/{siteId}/{gatewayId}/sim to sim_info/read_sms/ussd/test_sms.
+
+const SimInboxItemSchema = z.object({
+  from: z.string().optional(),
+  text: z.string().default(''),
+  ts: z.string().optional(),
+});
+
+const SimPayloadSchema = z.object({
+  type: z.enum(['sim_info', 'sms_list', 'ussd', 'test_sms']).optional(),
+  iccid: z.string().optional(),
+  imsi: z.string().optional(),
+  number: z.string().optional(),
+  operator: z.string().optional(),
+  signal: z.number().optional(),
+  registered: z.boolean().optional(),
+  canSend: z.boolean().optional(),
+  balanceText: z.string().optional(),
+  messages: z.array(SimInboxItemSchema).optional(),
+  ok: z.boolean().optional(),
+  error: z.string().optional(),
+});
+
+export async function handleSim(siteId: string, gatewayId: string, payload: Buffer): Promise<void> {
+  const raw = safeParseJson(payload);
+  if (raw === null) {
+    logger.warn('MQTT sim: invalid JSON — dropped');
+    return;
+  }
+  const parsed = SimPayloadSchema.safeParse(raw);
+  if (!parsed.success) {
+    logger.warn({ issues: parsed.error.issues }, 'MQTT sim: schema invalid — dropped');
+    return;
+  }
+  const d = parsed.data;
+
+  try {
+    // Merge only the fields present in this response into gateway.sim
+    const set: Record<string, unknown> = { 'sim.lastCheckedAt': new Date() };
+    if (d.iccid !== undefined) set['sim.iccid'] = d.iccid;
+    if (d.imsi !== undefined) set['sim.imsi'] = d.imsi;
+    if (d.number !== undefined) set['sim.number'] = d.number;
+    if (d.operator !== undefined) set['sim.operator'] = d.operator;
+    if (d.signal !== undefined) set['sim.signal'] = d.signal;
+    if (d.registered !== undefined) set['sim.registered'] = d.registered;
+    if (d.canSend !== undefined) set['sim.canSend'] = d.canSend;
+    if (d.balanceText !== undefined) set['sim.balanceText'] = d.balanceText;
+    if (d.messages !== undefined) set['sim.messages'] = d.messages.slice(0, 20);
+
+    await Gateway.findOneAndUpdate({ gatewayId }, { $set: set });
+
+    emitSim(siteId, { gatewayId, ...d, at: new Date().toISOString() });
+    logger.info({ gatewayId, type: d.type }, 'SIM response ingested');
+  } catch (err) {
+    logger.error({ err, gatewayId }, 'Failed to persist SIM response');
   }
 }

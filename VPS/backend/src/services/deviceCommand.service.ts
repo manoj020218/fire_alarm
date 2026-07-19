@@ -21,7 +21,15 @@ export interface GatewayConfigPayload {
 }
 
 export interface GatewayCommandPayload {
-  command: 'reboot' | 'sync_time' | 'force_mqtt_reconnect' | 'test_alarm';
+  command:
+    | 'reboot'
+    | 'sync_time'
+    | 'force_mqtt_reconnect'
+    | 'test_alarm'
+    | 'sim_info'
+    | 'read_sms'
+    | 'ussd'
+    | 'test_sms';
   params?: Record<string, unknown>;
   issuedAt: string;
 }

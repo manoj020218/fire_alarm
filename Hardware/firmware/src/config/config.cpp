@@ -150,3 +150,10 @@ void config_derive_gateway_id() {
         LOG_I("CFG", "Derived gatewayId: %s", s_cfg.gatewayId);
     }
 }
+
+// Apply SMS config pushed from the cloud (config/set) and persist to NVS.
+void config_set_sms(const char* numbers, bool enabled) {
+    if (numbers) strlcpy(s_cfg.smsNumbers, numbers, sizeof(s_cfg.smsNumbers));
+    s_cfg.smsEnabled = enabled;
+    config_save();
+}

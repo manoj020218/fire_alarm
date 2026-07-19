@@ -22,6 +22,7 @@
 #include "net/modem4g.h"
 #include "mqttc/mqtt.h"
 #include "mqttc/topics.h"
+#include "sim/simsvc.h"
 #include "modbus/registers.h"
 #include "io/dio.h"
 #include "alarms/engine.h"
@@ -365,6 +366,9 @@ void loop() {
 
     // MQTT keepalive / reconnect
     mqtt_loop();
+
+    // Run any queued on-demand SIM command (blocking AT, off the MQTT callback)
+    simsvc_step();
 
     // Replay SD buffer when MQTT reconnects
     replay_sd_buffer();

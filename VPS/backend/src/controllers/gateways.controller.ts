@@ -18,6 +18,7 @@ import type {
   GatewayCommandBody,
   ClaimGatewayBody,
   PoolGatewayBody,
+  SmsConfigBody,
 } from '../validation/gateways.schema';
 
 /** Generate a short, human-friendly, unambiguous claim code (no 0/O/1/I). */
@@ -136,6 +137,41 @@ export const putGatewayConfig = asyncHandler(async (req: Request, res: Response)
   });
 
   res.json({ ok: true, gatewayId: id, configs: upsertResults });
+});
+
+// ── PUT /api/gateways/:id/sms ─────────────────────────────────────────────────
+// Save SMS-alert + operator config on the gateway and push it to the device.
+
+export const putSmsConfig = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as { id: string };
+  const body = req.body as SmsConfigBody;
+
+  const gateway = await Gateway.findOne({ gatewayId: id });
+  if (!gateway) throw AppError.notFound('Gateway');
+  if (!canAccessSite(req.user, gateway.siteId)) throw AppError.forbidden();
+
+  gateway.smsConfig = {
+    enabled: body.enabled,
+    numbers: body.numbers ?? '',
+    operator: body.operator,
+    balanceUssd: body.balanceUssd,
+    numberUssd: body.numberUssd,
+  };
+  await gateway.save();
+
+  // Push to the device via config/set (customSettings.sms)
+  publishGatewayConfig(id, gateway.siteId, { customSettings: { sms: gateway.smsConfig } });
+
+  await writeAudit({
+    action: 'CONFIG_CHANGE',
+    entity: 'Gateway',
+    entityId: id,
+    after: { sms: { enabled: body.enabled, numbers: body.numbers, operator: body.operator } },
+    req,
+  });
+
+  res.json({ ok: true, gatewayId: id, smsConfig: gateway.smsConfig });
 });
 
 // ── POST /api/gateways/:id/command ───────────────────────────────────────────

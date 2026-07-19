@@ -40,6 +40,33 @@ export interface SubscriptionResponse {
 
 // ── Gateway ───────────────────────────────────────────────────────────────────
 
+export interface GatewaySmsConfig {
+  enabled: boolean
+  numbers: string
+  operator?: string
+  balanceUssd?: string
+  numberUssd?: string
+}
+
+export interface SimInboxItem {
+  from?: string
+  text: string
+  ts?: string
+}
+
+export interface GatewaySim {
+  iccid?: string
+  imsi?: string
+  number?: string
+  operator?: string
+  signal?: number
+  registered?: boolean
+  canSend?: boolean
+  balanceText?: string
+  messages?: SimInboxItem[]
+  lastCheckedAt?: string
+}
+
 export interface GatewayItem {
   gatewayId: string
   siteId: string
@@ -52,6 +79,17 @@ export interface GatewayItem {
   rssi?: number
   signal4g?: number
   uptime?: number
+  smsConfig?: GatewaySmsConfig
+  sim?: GatewaySim
+}
+
+/** Live 'sim' socket event payload from the gateway. */
+export interface SimEvent extends GatewaySim {
+  gatewayId: string
+  type?: 'sim_info' | 'sms_list' | 'ussd' | 'test_sms'
+  ok?: boolean
+  error?: string
+  at?: string
 }
 
 export interface GatewaysResponse {

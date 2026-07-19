@@ -6,6 +6,43 @@ import mongoose, { Document, Schema, Model } from 'mongoose';
 
 export type UplinkType = 'wifi' | 'lan' | '4g';
 
+/** SMS alerting + SIM operator config (pushed to the gateway). */
+export interface ISmsConfig {
+  enabled: boolean;
+  /** comma-separated E.164 recipient numbers, e.g. "+9172...,+9198..." */
+  numbers: string;
+  /** 'airtel' | 'jio' | 'vi' | 'bsnl' | 'custom' */
+  operator?: string;
+  /** USSD code to check prepaid balance/validity, e.g. "*123#" */
+  balanceUssd?: string;
+  /** USSD code to fetch the SIM's own number, e.g. "*1#" */
+  numberUssd?: string;
+}
+
+export interface ISmsInboxItem {
+  from?: string;
+  text: string;
+  ts?: string;
+}
+
+/** Latest SIM/cellular status reported by the gateway (on demand or periodic). */
+export interface ISimInfo {
+  iccid?: string;
+  imsi?: string;
+  number?: string;
+  operator?: string;
+  /** signal quality 0-31 (CSQ) or dBm-derived bars */
+  signal?: number;
+  registered?: boolean;
+  /** network registered + can send SMS */
+  canSend?: boolean;
+  /** last USSD balance response text */
+  balanceText?: string;
+  /** recent inbox messages fetched on demand */
+  messages?: ISmsInboxItem[];
+  lastCheckedAt?: Date;
+}
+
 export interface IGateway {
   gatewayId: string;
   siteId: string;
@@ -26,6 +63,10 @@ export interface IGateway {
   claimCode?: string;
   /** false = pre-provisioned in the pool, not yet bound to a customer site (schema default: true) */
   claimed?: boolean;
+  /** SMS alerting + operator config */
+  smsConfig?: ISmsConfig;
+  /** Latest SIM/cellular status */
+  sim?: ISimInfo;
 }
 
 export interface IGatewayDocument extends IGateway, Document {}
@@ -80,6 +121,25 @@ const GatewaySchema = new Schema<IGatewayDocument>(
     /** Hidden by default; only surfaced to super-admin at pool creation */
     claimCode: { type: String, select: false, trim: true, uppercase: true },
     claimed: { type: Boolean, default: true },
+    smsConfig: {
+      enabled: { type: Boolean, default: false },
+      numbers: { type: String, default: '', maxlength: 400 },
+      operator: { type: String, trim: true, maxlength: 20 },
+      balanceUssd: { type: String, trim: true, maxlength: 20 },
+      numberUssd: { type: String, trim: true, maxlength: 20 },
+    },
+    sim: {
+      iccid: { type: String, trim: true },
+      imsi: { type: String, trim: true },
+      number: { type: String, trim: true },
+      operator: { type: String, trim: true },
+      signal: { type: Number },
+      registered: { type: Boolean },
+      canSend: { type: Boolean },
+      balanceText: { type: String, maxlength: 500 },
+      messages: [{ from: String, text: String, ts: String, _id: false }],
+      lastCheckedAt: { type: Date },
+    },
   },
   {
     timestamps: true,

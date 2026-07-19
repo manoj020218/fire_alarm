@@ -114,6 +114,11 @@ export function emitGatewayStatus(siteId: string, data: unknown): void {
   io?.to(`site:${siteId}`).emit('gateway-status', data);
 }
 
+/** Broadcast a SIM/cellular response to the site room. */
+export function emitSim(siteId: string, data: unknown): void {
+  io?.to(`site:${siteId}`).emit('sim', data);
+}
+
 /** Get the io instance (null before initSocketServer is called). */
 export function getIo(): IoInstance | null {
   return io;

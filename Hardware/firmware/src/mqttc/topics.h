@@ -22,6 +22,7 @@ inline String topic(const char* leaf) {
 inline String topic_telemetry() { return topic("telemetry"); }
 inline String topic_status()    { return topic("status");    }
 inline String topic_alarm()     { return topic("alarm");     }
+inline String topic_sim()       { return topic("sim");       }
 inline String topic_config_get(){ return topic("config/get");}
 
 // Subscribe topics (broker → gateway)

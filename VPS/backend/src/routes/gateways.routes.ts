@@ -20,6 +20,7 @@ import {
   GatewayCommandSchema,
   ClaimGatewaySchema,
   PoolGatewaySchema,
+  SmsConfigSchema,
 } from '../validation/gateways.schema';
 import {
   listGateways,
@@ -27,6 +28,7 @@ import {
   updateGateway,
   getGatewayConfig,
   putGatewayConfig,
+  putSmsConfig,
   sendGatewayCommand,
   rotateDeviceToken,
   claimGateway,
@@ -67,6 +69,13 @@ router.put(
   requireRole('CLIENT_ADMIN'),
   validate({ params: GatewayParamsSchema, body: GatewayConfigSchema }),
   putGatewayConfig
+);
+
+router.put(
+  '/:id/sms',
+  requireRole('CLIENT_ADMIN'),
+  validate({ params: GatewayParamsSchema, body: SmsConfigSchema }),
+  putSmsConfig
 );
 
 router.post(

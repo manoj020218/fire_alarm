@@ -40,6 +40,14 @@ bool   modem4g_is_registered();
 // Brackets the blocking sendSMS() call with esp_task_wdt_reset().
 bool   modem4g_send_sms(const char* number, const char* text);
 
+// ── SIM / cellular info (on-demand; each brackets blocking AT with wdt resets) ──
+String modem4g_iccid();                       // SIM serial (getSimCCID)
+String modem4g_imsi();                        // AT+CIMI
+int    modem4g_signal_csq();                  // 0-31 (99 = unknown)
+String modem4g_own_number();                  // AT+CNUM (often blank — operator-dependent)
+String modem4g_ussd(const char* code);        // AT+CUSD balance/validity → raw text
+String modem4g_read_sms_raw();                // AT+CMGL="ALL" text-mode dump
+
 // Access the underlying TinyGSM client (owned by uplink module)
 class Client;
 Client* modem4g_get_client();
