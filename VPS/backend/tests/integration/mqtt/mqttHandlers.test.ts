@@ -152,7 +152,7 @@ describe('handleTelemetry', () => {
 
 describe('handleStatus', () => {
   it('updates gateway heartbeat fields', async () => {
-    await handleStatus(toBuffer(statusPayload));
+    await handleStatus(SITE_ID, GATEWAY_ID, toBuffer(statusPayload));
     const gw = await Gateway.findOne({ gatewayId: GATEWAY_ID });
     expect(gw?.online).toBe(true);
     expect(gw?.uptime).toBe(7200);
@@ -160,11 +160,16 @@ describe('handleStatus', () => {
   });
 
   it('drops invalid JSON without throwing', async () => {
-    await expect(handleStatus(Buffer.from('{bad'))).resolves.toBeUndefined();
+    await expect(handleStatus(SITE_ID, GATEWAY_ID, Buffer.from('{bad'))).resolves.toBeUndefined();
   });
 
-  it('drops schema-invalid payload without throwing', async () => {
-    await expect(handleStatus(toBuffer({ noGatewayId: true }))).resolves.toBeUndefined();
+  it('marks the gateway offline from a minimal Last-Will (identity from topic)', async () => {
+    // start online
+    await handleStatus(SITE_ID, GATEWAY_ID, toBuffer(statusPayload));
+    // Last-Will body carries no gatewayId/siteId — identity comes from the topic
+    await handleStatus(SITE_ID, GATEWAY_ID, toBuffer({ online: false }));
+    const gw = await Gateway.findOne({ gatewayId: GATEWAY_ID });
+    expect(gw?.online).toBe(false);
   });
 });
 

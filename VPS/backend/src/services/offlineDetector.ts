@@ -8,8 +8,10 @@ import { Gateway } from '../models/Gateway';
 import { emitGatewayStatus } from '../socket/socketServer';
 import logger from '../config/logger';
 
-const OFFLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
-const CHECK_INTERVAL_MS = 30_000;            // 30 seconds
+// Backup detector — the primary offline signal is now the MQTT Last-Will (instant).
+// This only catches silent drops (network partition with no clean disconnect).
+const OFFLINE_THRESHOLD_MS = 75_000; // 75 s without a status/telemetry heartbeat
+const CHECK_INTERVAL_MS = 20_000;    // check every 20 s
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 

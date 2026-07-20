@@ -49,8 +49,10 @@ const TelemetryPayloadSchema = z.object({
 }).passthrough();
 
 const StatusPayloadSchema = z.object({
-  gatewayId: z.string().min(1),
-  siteId: z.string().min(1),
+  // Optional: the MQTT Last-Will publishes just {online:false}; identity comes
+  // from the topic (fireguard/{siteId}/{gatewayId}/status) in that case.
+  gatewayId: z.string().min(1).optional(),
+  siteId: z.string().min(1).optional(),
   online: z.boolean().optional().default(true),
   fw: z.string().optional(),
   uplink: z.enum(['wifi', 'lan', '4g']).optional(),
@@ -100,7 +102,7 @@ export async function handleMqttMessage(topic: string, payload: Buffer): Promise
     if (suffix === 'telemetry') {
       await handleTelemetry(payload);
     } else if (suffix === 'status') {
-      await handleStatus(payload);
+      await handleStatus(parts[1] ?? '', parts[2] ?? '', payload);
     } else if (suffix === 'alarm') {
       await handleAlarm(payload);
     } else if (suffix === 'sim') {
@@ -198,7 +200,11 @@ export async function handleTelemetry(
 
 // ─── Status handler ───────────────────────────────────────────────────────────
 
-export async function handleStatus(payload: Buffer): Promise<void> {
+export async function handleStatus(
+  topicSiteId: string,
+  topicGatewayId: string,
+  payload: Buffer
+): Promise<void> {
   const raw = safeParseJson(payload);
   if (raw === null) {
     logger.warn('MQTT status: invalid JSON — dropped');
@@ -212,11 +218,19 @@ export async function handleStatus(payload: Buffer): Promise<void> {
   }
 
   const d = parsed.data;
+  // Fall back to topic-derived identity — the offline Last-Will carries neither.
+  const gatewayId = d.gatewayId ?? topicGatewayId;
+  const siteId = d.siteId ?? topicSiteId;
+  if (!gatewayId || !siteId) {
+    logger.warn('MQTT status: no gatewayId/siteId in body or topic — dropped');
+    return;
+  }
+  const online = d.online ?? true;
 
   try {
     const update: Record<string, unknown> = {
       lastSeenAt: new Date(),
-      online: d.online ?? true,
+      online,
     };
     if (d.fw !== undefined) update['fw'] = d.fw;
     if (d.uplink !== undefined) update['uplink'] = d.uplink;
@@ -226,22 +240,19 @@ export async function handleStatus(payload: Buffer): Promise<void> {
     if (d.heap !== undefined) update['heap'] = d.heap;
     if (d.rssi !== undefined) update['rssi'] = d.rssi;
 
-    await Gateway.findOneAndUpdate(
-      { gatewayId: d.gatewayId },
-      { $set: update as object },
-      { upsert: false }
-    );
+    await Gateway.findOneAndUpdate({ gatewayId }, { $set: update as object }, { upsert: false });
 
-    emitGatewayStatus(d.siteId, {
-      gatewayId: d.gatewayId,
-      siteId: d.siteId,
-      online: d.online ?? true,
+    emitGatewayStatus(siteId, {
+      gatewayId,
+      siteId,
+      online,
       fw: d.fw,
       uplink: d.uplink,
+      lastSeenAt: new Date().toISOString(),
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
-    logger.error({ err, gatewayId: d.gatewayId }, 'Failed to update gateway status');
+    logger.error({ err, gatewayId }, 'Failed to update gateway status');
   }
 }
 

@@ -7,9 +7,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
+import { connectSocket, getSocket } from '../lib/socket'
 import { formatUptime, formatLastSeen, formatSignal } from '../lib/mapper'
 import type { GatewayItem, GatewaysResponse, ClaimGatewayResponse } from '../lib/types'
 import axios from 'axios'
+
+// Uplink label — 4G modem is the SIM path.
+const UPLINK_LABEL: Record<string, string> = { wifi: 'WiFi', lan: 'LAN', '4g': 'SIM (4G)' }
 
 import AppShell from '../components/ui/AppShell'
 import SectionCard from '../components/ui/SectionCard'
@@ -146,7 +150,7 @@ function GatewayCard({ gw, canManage, onManage, onDevices }: { gw: GatewayItem; 
           <p className="text-xs text-slate-500 truncate">{gw.gatewayId}</p>
         </div>
         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${gw.online ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`}>
-          {gw.online ? 'Online' : 'Offline'}
+          {gw.online ? `Online${gw.uplink ? ' · ' + (UPLINK_LABEL[gw.uplink] ?? gw.uplink) : ''}` : 'Offline'}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4 text-xs text-slate-600">
@@ -216,6 +220,26 @@ export default function Gateways() {
   useEffect(() => {
     void fetchGateways()
   }, [fetchGateways])
+
+  // Live online/offline + uplink via Socket.IO (instant on the gateway's Last-Will).
+  useEffect(() => {
+    const token = localStorage.getItem('fg_token')
+    if (!token || !siteId) return
+    connectSocket(token, siteId)
+    const socket = getSocket()
+    if (!socket) return
+    const onStatus = (data: { gatewayId: string; online?: boolean; uplink?: GatewayItem['uplink']; lastSeenAt?: string }) => {
+      setGateways((prev) =>
+        prev.map((g) =>
+          g.gatewayId === data.gatewayId
+            ? { ...g, online: data.online ?? g.online, uplink: data.uplink ?? g.uplink, lastSeenAt: data.lastSeenAt ?? g.lastSeenAt }
+            : g
+        )
+      )
+    }
+    socket.on('gateway-status', onStatus)
+    return () => { socket.off('gateway-status', onStatus) }
+  }, [siteId])
 
   const onlineCount = gateways.filter((g) => g.online).length
 
