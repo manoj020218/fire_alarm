@@ -76,6 +76,10 @@ struct GatewayConfig {
     char smsNumbers[64];  // comma-separated E.164 numbers, e.g. "+9172...,+9198..."
     bool smsEnabled;      // master switch; default false
 
+    // Cellular: force LTE-only network mode. Turn ON for JIO (LTE/VoLTE-only —
+    // won't attach in auto mode). Leave OFF (auto: 2G/3G/4G) for Airtel/VI/BSNL.
+    bool lteOnly;         // default false
+
     // Hardening
     uint8_t  autoRebootHour;   // hour (0-23) for daily auto-reboot; 255 = disabled
     bool     otaAuto;          // auto-apply OTA when manifest has update

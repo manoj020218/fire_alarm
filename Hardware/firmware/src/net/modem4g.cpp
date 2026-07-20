@@ -15,6 +15,7 @@
 #define TINY_GSM_MODEM_SIM7600
 #include <TinyGsmClient.h>
 #include "modem4g.h"
+#include "../config/config.h"
 #include "../config/pins.h"
 #include "../util/log.h"
 #include <esp_task_wdt.h>
@@ -83,16 +84,21 @@ Modem4gState modem4g_step(const char* apn) {
         if (s_modem.testAT(1500)) {
             s_modem.sendAT(GF("+CMEE=2"));
             s_modem.waitResponse(500);
-            // Operator-agnostic: automatic network mode (works for JIO/Airtel/VI/BSNL —
-            // modem picks 2G/3G/4G as available) + enable VoLTE (needed for SMS/calls on
-            // LTE-only JIO, harmless on others). Explicitly setting auto also clears any
-            // stale saved mode that could block registration.
-            s_modem.sendAT(GF("+CNMP=2"));    // 2 = automatic (all RATs)
+            // Network mode: LTE-only when the 'JIO / LTE-only' toggle is ON (JIO is
+            // LTE/VoLTE-only and won't attach in auto mode); otherwise automatic
+            // (2G/3G/4G) for Airtel/VI/BSNL. VoLTE always enabled (needed for JIO
+            // SMS/calls, harmless elsewhere).
+            if (getConfig().lteOnly) {
+                s_modem.sendAT(GF("+CNMP=38"));   // 38 = LTE only
+            } else {
+                s_modem.sendAT(GF("+CNMP=2"));    // 2 = automatic (all RATs)
+            }
             s_modem.waitResponse(3000);
-            s_modem.sendAT(GF("+CVOLTE=1"));  // enable VoLTE (SMS/calls over IMS)
+            s_modem.sendAT(GF("+CVOLTE=1"));      // enable VoLTE (SMS/calls over IMS)
             s_modem.waitResponse(3000);
             s_netDeadline = millis() + WAIT_NETWORK_TOTAL_MS;
-            LOG_I("4G", "AT OK, auto-mode+VoLTE set — waiting for registration");
+            LOG_I("4G", "AT OK, mode=%s +VoLTE — waiting for registration",
+                  getConfig().lteOnly ? "LTE-only" : "auto");
             enter(Modem4gState::WAIT_NETWORK);
         } else if (elapsed() > WAIT_AT_TIMEOUT_MS) {
             LOG_W("4G", "No AT response — scheduling retry");

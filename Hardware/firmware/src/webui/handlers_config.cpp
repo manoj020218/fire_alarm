@@ -79,6 +79,7 @@ static void handle_get_config(AsyncWebServerRequest* req) {
     // SMS config (Change 3)
     doc["smsNumbers"] = cfg.smsNumbers;
     doc["smsEnabled"] = cfg.smsEnabled;
+    doc["lteOnly"]    = cfg.lteOnly;
 
     // WiFi STA SSID (stored separately)
     Preferences wprefs;
@@ -153,6 +154,8 @@ static void handle_post_config(AsyncWebServerRequest* req, uint8_t* data,
         strlcpy(cfg.smsNumbers, doc["smsNumbers"].as<const char*>(), sizeof(cfg.smsNumbers));
     if (doc.containsKey("smsEnabled"))
         cfg.smsEnabled = doc["smsEnabled"].as<bool>();
+    if (doc.containsKey("lteOnly"))
+        cfg.lteOnly = doc["lteOnly"].as<bool>();
 
     config_save();
 

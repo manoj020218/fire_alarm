@@ -64,6 +64,9 @@
 #define SMS_NUMBERS_DEFAULT     ""          // blank = none configured
 #define SMS_ENABLED_DEFAULT     false       // off by default
 
+// --- Cellular: LTE-only (JIO) mode --------------------------
+#define LTE_ONLY_DEFAULT        false       // OFF = auto (all operators); ON = LTE-only (JIO)
+
 // --- OTA / backup -------------------------------------------
 #define OTA_VALIDATE_WINDOW_MS  300000      // 5 min self-validate window
 #define HTTP_CLIENT_TIMEOUT_MS  15000
