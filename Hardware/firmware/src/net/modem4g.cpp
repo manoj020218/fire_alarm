@@ -96,6 +96,19 @@ Modem4gState modem4g_step(const char* apn) {
             s_modem.waitResponse(3000);
             s_modem.sendAT(GF("+CVOLTE=1"));      // enable VoLTE (SMS/calls over IMS)
             s_modem.waitResponse(3000);
+            // Set the LTE default-bearer APN (CID 1) BEFORE attach. JIO won't complete
+            // LTE data registration without the APN in the default context (e.g. jionet).
+            {
+                const char* apnCfg = getConfig().apn;
+                if (apnCfg && apnCfg[0]) {
+                    String cgd = "+CGDCONT=1,\"IP\",\"";
+                    cgd += apnCfg;
+                    cgd += "\"";
+                    s_modem.sendAT(cgd.c_str());
+                    s_modem.waitResponse(2000);
+                    LOG_I("4G", "Default bearer APN set: %s", apnCfg);
+                }
+            }
             s_netDeadline = millis() + WAIT_NETWORK_TOTAL_MS;
             LOG_I("4G", "AT OK, mode=%s +VoLTE — waiting for registration",
                   getConfig().lteOnly ? "LTE-only" : "auto");
