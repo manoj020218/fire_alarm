@@ -68,7 +68,12 @@ SIM inserted (`+919928…`), signal ~26-28 but `registered:false` (tomorrow's fi
 
 ## Open items
 1. **SIM data uplink overhaul** (tomorrow) — `SIM_UPLINK_PLAN.md`: A7672X modem profile (not
-   SIM7600), continuous modem cadence, SIM-first priority `4G > WiFi > LAN`, longer attach,
+   SIM7600), continuous modem cadence, **configurable per-gateway priority** (dashboard-set via
+   config/set; default SIM-first `4G>WiFi>LAN`; hold-down + keep-4G-warm), longer attach,
    raw modem status, local SIM diagnostics. Deliver via OTA.
-2. `.../ota` MQTT topic subscribe unreliable (PubSubClient) — using `/command` instead.
-3. Marketing site (:80 default) returns 200 for `.env`/probe paths (SPA fallback) — low-pri harden.
+2. **Multi-protocol capture + LAN WebUI roadmap** — `LAN_DEVICE_CAPTURE.md`: add **Modbus TCP**
+   device polling (reuses the RS485 register-map pipeline; UI gains conn-type RS485|TCP + IP:port);
+   move W5500 to ESP-IDF **`ETH.h`/lwIP** so the WebUI is reachable over the Ethernet LAN IP (not
+   just the WiFi AP) and the uplink client code simplifies. Roadmap, not yet built.
+3. `.../ota` MQTT topic subscribe unreliable (PubSubClient) — using `/command` instead.
+4. Marketing site (:80 default) returns 200 for `.env`/probe paths (SPA fallback) — low-pri harden.

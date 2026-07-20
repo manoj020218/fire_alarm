@@ -28,20 +28,30 @@
 | S7 | **60 s registration timeout too short** — first attach can take minutes (TinyGSM README:310) (`modem4g.cpp:35`) | MED | Raise first-attach budget to **~3-5 min**; don't power-cycle the modem during a valid operator search |
 | S8 | **SIM debug only via MQTT** — dies with cellular (`mqtt.cpp:60`, `simsvc.cpp:26`) | MED | Add **local** SIM diagnostics (WebUI page / serial) that works with cellular down |
 
-## C. Uplink priority change (the user's core ask)
-In `probe_transports()` reorder to **4G → WiFi → LAN**:
-```
-modem4g_step(apn); if (modem4g_is_connected()) return G4;   // 1. SIM data first
-if (wifi_sta_connected())                        return WIFI; // 2. WiFi fallback
-eth_step(); if (eth_is_connected())              return LAN;  // 3. LAN last
-```
-Plus **hysteresis / hold-down**: once on 4G, don't flap to WiFi on a single missed poll; and when
-a higher-priority transport (4G) recovers, only pre-empt after it's been stably CONNECTED for N s,
-to avoid thrashing. Keep modem warm regardless (S3) so failover to 4G is immediate.
+## C. Uplink priority — CONFIGURABLE from the dashboard (per-gateway)
+Field reality varies per site and isn't in our control, so priority is a **per-gateway setting
+pushed from the dashboard** over the existing `config/set` MQTT pipe (same mechanism as SMS
+numbers / register map), stored in NVS. This removes the "SIM-first vs WiFi-first" guess — the
+installer picks per site. Default = **SIM-first**.
 
-> Note (cost): SIM-first means the unit always uses cellular data even when WiFi exists. Confirmed
-> this is intended (field units ship with SIM; WiFi/LAN are optional site upgrades). Revisit if
-> data cost matters — could prefer WiFi once it's been configured & healthy.
+**Config field (ordered list; omit a transport to DISABLE it):**
+```
+uplinkOrder: ["4g","wifi","lan"]   // probe in this order
+```
+Covers every case with one field:
+- SIM-first: `["4g","wifi","lan"]`  · WiFi/LAN-first (data-saver): `["wifi","lan","4g"]`
+- SIM-only: `["4g"]`  · WiFi-only: `["wifi"]`  · LAN-only: `["lan"]`
+
+`probe_transports()` loops over the configured order instead of the hardcoded `4G > LAN > WiFi`.
+
+**Dashboard UX:** preset dropdown (SIM first / WiFi-LAN first / SIM only / WiFi only / LAN only /
+Custom…), Custom = drag-to-reorder + on/off toggles.
+
+**Behavior defaults:**
+- **Preemptive with hold-down** — switch back to a higher-priority link only after it's stably
+  CONNECTED ~30s (avoids flapping). Failover down is immediate.
+- **Keep 4G warm regardless** (even if 4G is low-priority or disabled-for-data) so SMS / missed-call
+  fire alerts always work (S3). Warm modem = instant failover.
 
 ## D. Implementation order (all deliverable via OTA)
 1. **S2 modem profile → A7672X** (biggest single fix) + compile-verify against the A7672X driver.
@@ -49,7 +59,8 @@ to avoid thrashing. Keep modem warm regardless (S3) so failover to 4G is immedia
 3. **S5 SIM gate** + **S7 longer timeout / no mid-search power-cycle**.
 4. **S6 APN/RAT provisioning** presets + WebUI enforcement.
 5. **S4 raw status** exposure + **S8 local WebUI SIM diagnostics**.
-6. **C. priority 4G→WiFi→LAN** + hysteresis.
+6. **C. configurable priority** — `uplinkOrder` config field + `probe_transports()` loop +
+   dashboard control (pushed via `config/set`), default SIM-first, with hold-down + keep-4G-warm.
 7. Field-validate on **Airtel SIM** (auto RAT) first, then JIO (LTE-only) — over the real unit.
 
 ## E. Sequencing vs OTA
