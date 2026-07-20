@@ -199,8 +199,42 @@ bool modem4g_is_registered() {
         s_state == Modem4gState::FAILED) {
         return false;
     }
-    // For WAIT_NETWORK / CONNECTING_GPRS / CONNECTED query the modem directly
-    return s_modem.isNetworkConnected();
+    // Query the modem's actual network registration (CS + EPS/LTE), NOT the data
+    // (GPRS) session — the gateway may use WiFi/LAN for data while the SIM is still
+    // registered for SMS/voice. Registered = home(1) or roaming(5) on either CREG/CEREG.
+    const char* regCmds[2] = { "+CREG?", "+CEREG?" };
+    for (int i = 0; i < 2; i++) {
+        String r;
+        esp_task_wdt_reset();
+        s_modem.sendAT(regCmds[i]);
+        if (s_modem.waitResponse(1500, r) == 1) {
+            int comma = r.indexOf(',');       // +CREG: <n>,<stat>[,...]
+            if (comma > 0) {
+                int st = r.substring(comma + 1).toInt();
+                if (st == 1 || st == 5) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Place a short voice call (missed-call alert): dial, ring ~12 s, hang up.
+// Returns true if the call was initiated (modem accepted ATD).
+bool modem4g_call(const char* number) {
+    if (!number || !number[0]) return false;
+    esp_task_wdt_reset();
+    String cmd = "ATD";
+    cmd += number;
+    cmd += ";";                       // ';' = voice call
+    s_modem.sendAT(cmd.c_str());
+    int r = s_modem.waitResponse(10000L);   // OK once the call is placed
+    if (r == 1) {
+        for (int i = 0; i < 12; i++) { delay(1000); esp_task_wdt_reset(); }  // let it ring
+    }
+    s_modem.sendAT(GF("+CHUP"));       // hang up
+    s_modem.waitResponse(3000);
+    esp_task_wdt_reset();
+    return r == 1;
 }
 
 bool modem4g_send_sms(const char* number, const char* text) {

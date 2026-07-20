@@ -57,8 +57,9 @@ static void dispatch_command(const char* cmdJson, unsigned int len) {
     const char* command = doc["command"] | "";
     if (!command[0]) return;
 
-    if (strcmp(command, "sim_info") == 0 || strcmp(command, "read_sms") == 0 ||
-        strcmp(command, "ussd")     == 0 || strcmp(command, "test_sms") == 0) {
+    if (strcmp(command, "sim_info") == 0 || strcmp(command, "read_sms")  == 0 ||
+        strcmp(command, "ussd")     == 0 || strcmp(command, "test_sms")  == 0 ||
+        strcmp(command, "test_call") == 0) {
         const char* code   = doc["params"]["code"]   | "";
         const char* number = doc["params"]["number"] | "";
         simsvc_request(command, code, number);      // runs in the main loop

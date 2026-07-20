@@ -86,7 +86,7 @@ export interface GatewayItem {
 /** Live 'sim' socket event payload from the gateway. */
 export interface SimEvent extends GatewaySim {
   gatewayId: string
-  type?: 'sim_info' | 'sms_list' | 'ussd' | 'test_sms'
+  type?: 'sim_info' | 'sms_list' | 'ussd' | 'test_sms' | 'test_call'
   ok?: boolean
   error?: string
   at?: string

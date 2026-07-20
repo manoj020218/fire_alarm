@@ -37,6 +37,7 @@ export const GatewayCommandSchema = z.object({
     'read_sms',
     'ussd',
     'test_sms',
+    'test_call',
   ]),
   params: z.record(z.string(), z.unknown()).optional(),
 });

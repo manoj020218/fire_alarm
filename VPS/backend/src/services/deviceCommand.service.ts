@@ -29,7 +29,8 @@ export interface GatewayCommandPayload {
     | 'sim_info'
     | 'read_sms'
     | 'ussd'
-    | 'test_sms';
+    | 'test_sms'
+    | 'test_call';
   params?: Record<string, unknown>;
   issuedAt: string;
 }

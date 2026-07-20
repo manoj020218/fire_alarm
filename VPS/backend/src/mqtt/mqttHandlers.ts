@@ -312,7 +312,7 @@ const SimInboxItemSchema = z.object({
 });
 
 const SimPayloadSchema = z.object({
-  type: z.enum(['sim_info', 'sms_list', 'ussd', 'test_sms']).optional(),
+  type: z.enum(['sim_info', 'sms_list', 'ussd', 'test_sms', 'test_call']).optional(),
   iccid: z.string().optional(),
   imsi: z.string().optional(),
   number: z.string().optional(),

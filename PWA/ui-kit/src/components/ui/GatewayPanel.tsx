@@ -21,7 +21,7 @@ const OPERATORS: Record<string, { label: string; balanceUssd: string; numberUssd
   custom: { label: 'Other / Custom', balanceUssd: '', numberUssd: '' },
 }
 
-type Waiting = null | 'sim_info' | 'read_sms' | 'ussd' | 'test_sms'
+type Waiting = null | 'sim_info' | 'read_sms' | 'ussd' | 'test_sms' | 'test_call'
 
 export default function GatewayPanel({
   gateway,
@@ -70,6 +70,9 @@ export default function GatewayPanel({
       setWaiting(null)
       if (waitTimer.current) clearTimeout(waitTimer.current)
       if (ev.error) setNote(`Gateway reported: ${ev.error}`)
+      else if (ev.type === 'test_sms' && ev.ok) setNote('Test SMS sent ✓')
+      else if (ev.type === 'test_call' && ev.ok) setNote('Call placed ✓ — the number should get a missed call.')
+      else setNote(null)
     }
     socket.on('sim', onSim)
     return () => {
@@ -212,8 +215,9 @@ export default function GatewayPanel({
               <Button variant="secondary" size="sm" className="justify-center" loading={waiting === 'read_sms'} onClick={() => void runCommand('read_sms')}>Read messages</Button>
               <Button variant="secondary" size="sm" className="justify-center" loading={waiting === 'ussd'} onClick={() => void runCommand('ussd', { code: balanceUssd })}>Check balance</Button>
               <Button variant="secondary" size="sm" className="justify-center" loading={waiting === 'test_sms'} disabled={!firstNumber} onClick={() => void runCommand('test_sms', { number: firstNumber })}>Send test SMS</Button>
+              <Button variant="secondary" size="sm" className="justify-center col-span-2" loading={waiting === 'test_call'} disabled={!firstNumber} onClick={() => void runCommand('test_call', { number: firstNumber })}>Test call (missed-call alert)</Button>
             </div>
-            {!firstNumber && <p className="text-[11px] text-slate-400 mt-1">Add an alert number above to enable the test SMS.</p>}
+            {!firstNumber && <p className="text-[11px] text-slate-400 mt-1">Add an alert number above to enable the test SMS / call.</p>}
           </section>
         </div>
       </div>

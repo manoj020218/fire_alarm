@@ -67,6 +67,16 @@ static void doTestSms() {
     publishSim(doc);
 }
 
+static void doTestCall() {
+    DynamicJsonDocument doc(512);
+    doc["type"] = "test_call";
+    if (!s_number[0]) { doc["ok"] = false; doc["error"] = "no number"; publishSim(doc); return; }
+    bool ok = modem4g_call(s_number);
+    doc["ok"] = ok;
+    if (!ok) doc["error"] = "call failed (check registration / VoLTE)";
+    publishSim(doc);
+}
+
 static void doReadSms() {
     String raw = modem4g_read_sms_raw();
     DynamicJsonDocument doc(4096);
@@ -109,8 +119,9 @@ void simsvc_step() {
     if (!s_pending) return;
     s_pending = false;
 
-    if      (strcmp(s_cmd, "sim_info") == 0) doSimInfo();
-    else if (strcmp(s_cmd, "ussd")     == 0) doUssd();
-    else if (strcmp(s_cmd, "read_sms") == 0) doReadSms();
-    else if (strcmp(s_cmd, "test_sms") == 0) doTestSms();
+    if      (strcmp(s_cmd, "sim_info")  == 0) doSimInfo();
+    else if (strcmp(s_cmd, "ussd")      == 0) doUssd();
+    else if (strcmp(s_cmd, "read_sms")  == 0) doReadSms();
+    else if (strcmp(s_cmd, "test_sms")  == 0) doTestSms();
+    else if (strcmp(s_cmd, "test_call") == 0) doTestCall();
 }
