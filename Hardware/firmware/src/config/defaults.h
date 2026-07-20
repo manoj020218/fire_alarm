@@ -68,7 +68,9 @@
 #define LTE_ONLY_DEFAULT        false       // OFF = auto (all operators); ON = LTE-only (JIO)
 
 // --- OTA / backup -------------------------------------------
-#define OTA_VALIDATE_WINDOW_MS  300000      // 5 min self-validate window
+// 10-min self-validate window: over a flaky SIM the modem may take minutes to
+// re-attach after reboot; too-short a window would roll back a healthy image.
+#define OTA_VALIDATE_WINDOW_MS  600000      // 10 min self-validate window
 #define HTTP_CLIENT_TIMEOUT_MS  15000
 #define OTA_AUTO_DEFAULT        false       // require explicit trigger; manifest check is passive
 

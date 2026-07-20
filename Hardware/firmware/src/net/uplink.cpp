@@ -22,7 +22,8 @@
 #include <Preferences.h>
 
 static UplinkType s_active     = UplinkType::NONE;
-static Client*    s_client     = nullptr;
+static Client*    s_client     = nullptr;   // MQTT
+static Client*    s_httpClient = nullptr;   // HTTP/api — separate socket from MQTT
 static Task       s_checkTask  = {0, UPLINK_CHECK_INTERVAL_MS};
 static bool       s_wifiInited = false;
 
@@ -101,12 +102,17 @@ void uplink_loop() {
         s_active = probe_transports();
     }
 
-    // Update client pointer
+    // Update client pointers — MQTT and HTTP get SEPARATE sockets so an HTTP
+    // request never clobbers the live MQTT connection.
     switch (s_active) {
-        case UplinkType::G4:   s_client = modem4g_get_client(); break;
-        case UplinkType::LAN:  s_client = eth_get_client();     break;
-        case UplinkType::WIFI: s_client = wifi_get_client();    break;
-        default:               s_client = nullptr;              break;
+        case UplinkType::G4:
+            s_client = modem4g_get_client();  s_httpClient = modem4g_get_http_client(); break;
+        case UplinkType::LAN:
+            s_client = eth_get_client();      s_httpClient = eth_get_http_client();     break;
+        case UplinkType::WIFI:
+            s_client = wifi_get_client();     s_httpClient = wifi_get_http_client();    break;
+        default:
+            s_client = nullptr;               s_httpClient = nullptr;                   break;
     }
 
     if (s_active != prev) {
@@ -131,6 +137,11 @@ const char* uplink_type_str() {
 Client& uplink_get_client() {
     static WiFiClient dummy;
     return s_client ? *s_client : dummy;
+}
+
+Client& uplink_get_http_client() {
+    static WiFiClient dummy;
+    return s_httpClient ? *s_httpClient : dummy;
 }
 
 int  uplink_signal_4g_dbm() { return modem4g_signal_dbm(); }

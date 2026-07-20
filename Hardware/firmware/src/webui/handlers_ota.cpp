@@ -31,30 +31,12 @@ static void handle_ota_check(AsyncWebServerRequest* req) {
         return;
     }
 
-    OtaResult r = ota_check_manifest();
-    StaticJsonDocument<128> doc;
-    doc["updateAvailable"] = ota_update_available();
-    switch (r) {
-        case OtaResult::UP_TO_DATE:
-            doc["status"] = "up_to_date";
-            break;
-        case OtaResult::UPDATED:
-            doc["status"] = "updated";
-            break;
-        case OtaResult::BACKUP_FAILED:
-            doc["status"] = "backup_failed";
-            break;
-        case OtaResult::DOWNLOAD_FAILED:
-            doc["status"] = "download_failed";
-            break;
-        default:
-            doc["status"] = "unknown";
-            break;
-    }
-
-    char buf[128];
-    serializeJson(doc, buf, sizeof(buf));
-    req->send(200, "application/json", buf);
+    // Deferred: the actual HTTP manifest fetch runs in the main loop, NOT on this
+    // async WebServer task (whose small stack + shared uplink Client crashed the
+    // device). The result appears on the OTA MQTT topic and in /api/ota/status.
+    ota_request_check();
+    req->send(200, "application/json",
+              "{\"ok\":true,\"status\":\"queued\",\"note\":\"check running; refresh status in a few seconds\"}");
 }
 
 static void handle_ota_update(AsyncWebServerRequest* req) {
@@ -63,16 +45,12 @@ static void handle_ota_update(AsyncWebServerRequest* req) {
         return;
     }
 
-    // Respond first (update will reboot the device)
-    req->send(200, "application/json", "{\"ok\":true,\"status\":\"starting\"}");
-
-    // Small delay to let response flush
-    delay(100);
-
-    OtaResult r = ota_begin_update();
-    // If we reach here, update did not reboot (error path)
-    (void)r;  // result was published via MQTT in ota_begin_update
-    LOG_W("WEBUI", "OTA update returned without reboot (error)");
+    // Deferred: queue a check-then-apply that runs in the main loop (backup +
+    // 1 MB download + reboot). Running it here on the async task overflowed the
+    // stack. Progress/result is published on the OTA MQTT topic.
+    ota_request_update();
+    req->send(200, "application/json",
+              "{\"ok\":true,\"status\":\"queued\",\"note\":\"backup+download running; device will reboot on success\"}");
 }
 
 void webui_register_ota(AsyncWebServer* srv) {

@@ -31,11 +31,11 @@ static void dispatch_ota_cmd(const char* cmdJson, unsigned int len) {
     if (deserializeJson(doc, cmdJson, len) != DeserializationError::Ok) return;
     const char* cmd = doc["cmd"] | "";
     if (strcmp(cmd, "check") == 0) {
-        LOG_I("MQTT", "OTA check command received");
-        ota_check_manifest();
+        LOG_I("MQTT", "OTA check command received (queued)");
+        ota_request_check();   // deferred — runs in main loop, not this callback
     } else if (strcmp(cmd, "update") == 0) {
-        LOG_I("MQTT", "OTA update command received");
-        ota_begin_update();
+        LOG_I("MQTT", "OTA update command received (queued)");
+        ota_request_update();  // deferred — check-then-apply in main loop
     } else {
         LOG_W("MQTT", "Unknown OTA cmd: %s", cmd);
     }
@@ -56,6 +56,19 @@ static void dispatch_command(const char* cmdJson, unsigned int len) {
     // Backend sends { command, params, issuedAt }
     const char* command = doc["command"] | "";
     if (!command[0]) return;
+
+    // OTA over the (proven-reliable) command topic — belt & suspenders alongside
+    // the dedicated `ota` topic. Deferred: runs in ota_service() on the loop.
+    if (strcmp(command, "ota_check") == 0) {
+        LOG_I("MQTT", "OTA check via command topic (queued)");
+        ota_request_check();
+        return;
+    }
+    if (strcmp(command, "ota_update") == 0) {
+        LOG_I("MQTT", "OTA update via command topic (queued)");
+        ota_request_update();
+        return;
+    }
 
     if (strcmp(command, "sim_info") == 0 || strcmp(command, "read_sms")  == 0 ||
         strcmp(command, "ussd")     == 0 || strcmp(command, "test_sms")  == 0 ||
@@ -105,11 +118,19 @@ static void on_message(char* topic, byte* payload, unsigned int len) {
 }
 
 // --- Subscribe all inbound topics ----------------------------
+// Pump s_mqtt.loop() + a short delay between each subscribe. Firing several
+// subscribe() calls back-to-back is a known PubSubClient failure mode: the later
+// SUBSCRIBE packets are not flushed to the socket and silently never register at
+// the broker — which is exactly why `command` (2nd) worked but `ota` (3rd) never
+// received messages, blocking VPS-triggered OTA.
 static void subscribe_all() {
-    s_mqtt.subscribe(topic_config_set().c_str());
-    s_mqtt.subscribe(topic_command().c_str());
-    s_mqtt.subscribe(topic_ota().c_str());
-    LOG_I("MQTT", "Subscribed: config/set command ota");
+    bool a = s_mqtt.subscribe(topic_config_set().c_str());
+    s_mqtt.loop(); delay(30);
+    bool b = s_mqtt.subscribe(topic_command().c_str());
+    s_mqtt.loop(); delay(30);
+    bool c = s_mqtt.subscribe(topic_ota().c_str());
+    s_mqtt.loop(); delay(30);
+    LOG_I("MQTT", "Subscribed config/set=%d command=%d ota=%d", (int)a, (int)b, (int)c);
 }
 
 // --- Connect (non-blocking attempt) --------------------------

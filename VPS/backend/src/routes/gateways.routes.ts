@@ -30,6 +30,7 @@ import {
   putGatewayConfig,
   putSmsConfig,
   sendGatewayCommand,
+  triggerOta,
   rotateDeviceToken,
   claimGateway,
   createPoolGateway,
@@ -90,6 +91,13 @@ router.post(
   requireRole('CLIENT_ADMIN'),
   validate({ params: GatewayParamsSchema, body: GatewayCommandSchema }),
   sendGatewayCommand
+);
+
+router.post(
+  '/:id/ota',
+  requireRole('CLIENT_ADMIN'),
+  validate({ params: GatewayParamsSchema }),
+  triggerOta
 );
 
 router.post(

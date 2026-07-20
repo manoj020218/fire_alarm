@@ -26,6 +26,18 @@
 #include <mbedtls/md.h>
 #include <ElegantOTA.h>
 
+// ---- Semver compare: true if `cand` > `cur` -----------------
+// Numeric per-field compare (NOT strcmp — "1.0.10" must beat "1.0.9").
+static bool ver_is_newer(const char* cand, const char* cur) {
+    int a[3] = {0, 0, 0}, b[3] = {0, 0, 0};
+    sscanf(cand, "%d.%d.%d", &a[0], &a[1], &a[2]);
+    sscanf(cur,  "%d.%d.%d", &b[0], &b[1], &b[2]);
+    for (int i = 0; i < 3; i++) {
+        if (a[i] != b[i]) return a[i] > b[i];
+    }
+    return false;
+}
+
 // ---- Pending-update state -----------------------------------
 static char  s_pendingVer[16]  = {};
 static char  s_pendingUrl[192] = {};
@@ -33,6 +45,10 @@ static char  s_pendingSha[65]  = {};
 static uint32_t s_pendingSize  = 0;
 static bool  s_updateAvail     = false;
 static bool  s_mandatory       = false;
+
+// ---- Deferred-request flags (set from MQTT/WebUI, run in loop) ----
+static bool  s_reqCheck        = false;
+static bool  s_reqUpdate       = false;
 
 // ---- Self-validation window --------------------------------
 static bool     s_needsValidation = false;
@@ -114,10 +130,13 @@ OtaResult ota_check_manifest() {
 
     if (resp.status == 204) {
         LOG_I("OTA", "Firmware up-to-date (%s)", FW_VERSION);
+        pub_ota("ota:up_to_date", FW_VERSION);
         return OtaResult::UP_TO_DATE;
     }
     if (resp.status != 200) {
         LOG_W("OTA", "Manifest fetch failed: %d", resp.status);
+        char d[24]; snprintf(d, sizeof(d), "http_%d", resp.status);
+        pub_ota("ota:check_failed", d);
         return OtaResult::DOWNLOAD_FAILED;
     }
 
@@ -126,6 +145,7 @@ OtaResult ota_check_manifest() {
     DeserializationError err = deserializeJson(doc, resp.body);
     if (err) {
         LOG_E("OTA", "Manifest JSON parse error: %s", err.c_str());
+        pub_ota("ota:check_failed", err.c_str());
         return OtaResult::DOWNLOAD_FAILED;
     }
 
@@ -137,12 +157,14 @@ OtaResult ota_check_manifest() {
 
     if (!version[0] || !url[0] || !sha256[0]) {
         LOG_E("OTA", "Manifest missing required fields");
+        pub_ota("ota:check_failed", "bad_manifest");
         return OtaResult::DOWNLOAD_FAILED;
     }
 
-    // Check if version is actually newer (simple strcmp — assume semver)
-    if (strcmp(version, FW_VERSION) <= 0 && !mandatory) {
+    // Check if version is actually newer (numeric semver, not strcmp)
+    if (!ver_is_newer(version, FW_VERSION) && !mandatory) {
         LOG_I("OTA", "No newer version (manifest=%s, running=%s)", version, FW_VERSION);
+        pub_ota("ota:up_to_date", FW_VERSION);
         return OtaResult::UP_TO_DATE;
     }
 
@@ -155,6 +177,7 @@ OtaResult ota_check_manifest() {
 
     LOG_I("OTA", "Update available: %s -> %s (mandatory=%d)",
           FW_VERSION, version, (int)mandatory);
+    pub_ota("ota:update_available", version);
 
     if (mandatory || cfg.otaAuto) {
         return ota_begin_update();
@@ -219,14 +242,12 @@ static size_t build_backup_json(char* buf, size_t bufLen) {
     // (alarms module doesn't expose iteration directly; omit detail)
     doc["alarmActiveCount"] = alarms_active_count();
 
-    // Undelivered SD records — drain up to 10 bounded
-    JsonArray undelivered = doc.createNestedArray("undelivered");
-    char lineBuf[256];
-    uint8_t drained = 0;
-    while (drained < 10 && sdbuf_replay_next(lineBuf, sizeof(lineBuf))) {
-        undelivered.add(lineBuf);
-        drained++;
-    }
+    // Undelivered SD records: report the pending COUNT only — do NOT drain them.
+    // sdbuf_replay_next() deletes records as it reads; if this /backup POST then
+    // failed, those buffered records would be lost forever. (D6) So we keep an
+    // empty array for schema compatibility and record the count separately.
+    doc.createNestedArray("undelivered");
+    doc["undeliveredPending"] = sdbuf_pending_count();
 
     // Health snapshot
     JsonObject health = doc.createNestedObject("health");
@@ -380,7 +401,7 @@ OtaResult ota_apply(const char* url, const char* expectedSha, uint32_t size) {
 
     LOG_I("OTA", "Connecting to %s:%d path=%s", otaHost, otaPort, otaPath);
 
-    HttpClient http(uplink_get_client(), otaHost, otaPort);
+    HttpClient http(uplink_get_http_client(), otaHost, otaPort);
     http.setTimeout(60000);  // 60 s — large binary over 4G may be slow
 
     http.beginRequest();
@@ -398,9 +419,9 @@ OtaResult ota_apply(const char* url, const char* expectedSha, uint32_t size) {
         return OtaResult::DOWNLOAD_FAILED;
     }
 
-    // Flush remaining response headers (ArduinoHttpClient reads status line +
-    // headers on responseStatusCode(); body bytes come via available()/read()).
-    // skipResponseHeaders() is not needed — status code call already consumed them.
+    // Skip the response headers BEFORE reading the binary body — otherwise the
+    // header bytes are written into the firmware image and the SHA-256 fails.
+    http.skipResponseHeaders();
 
     // Stream body in chunks — do NOT buffer the whole binary.
     // Use manifest 'size' as the authoritative byte count (stop when reached
@@ -501,6 +522,7 @@ OtaResult ota_apply(const char* url, const char* expectedSha, uint32_t size) {
 OtaResult ota_begin_update() {
     if (!s_updateAvail) {
         LOG_W("OTA", "begin_update: no pending update");
+        pub_ota("ota:no_update", "run check first");
         return OtaResult::UP_TO_DATE;
     }
 
@@ -512,6 +534,40 @@ OtaResult ota_begin_update() {
     }
 
     return ota_apply(s_pendingUrl, s_pendingSha, s_pendingSize);
+}
+
+// ---- Deferred/serialized OTA request handling ---------------
+// dispatch_ota_cmd() (MQTT rx callback) and the WebUI handlers only call these
+// setters. The actual blocking work runs in ota_service() from the main loop,
+// so we never do a 1 MB HTTP download on the MQTT callback / async WebServer
+// task stack (that overflowed the stack and used the same uplink Client as
+// MQTT → panic).
+void ota_request_check()  { s_reqCheck  = true; }
+void ota_request_update() { s_reqUpdate = true; }
+
+void ota_service() {
+    if (!s_reqCheck && !s_reqUpdate) return;
+    if (!uplink_is_up()) return;   // keep the flag set until an uplink exists
+
+    if (s_reqUpdate) {
+        s_reqUpdate = false;
+        s_reqCheck  = false;       // an update subsumes a pending check
+        LOG_I("OTA", "Servicing queued UPDATE");
+        // {cmd:update} implies a check: populate s_updateAvail if not already.
+        if (!s_updateAvail) {
+            ota_check_manifest();  // publishes its own outcome
+        }
+        if (s_updateAvail) {
+            ota_begin_update();    // publishes backup/updating/verify status
+        }
+        return;
+    }
+
+    if (s_reqCheck) {
+        s_reqCheck = false;
+        LOG_I("OTA", "Servicing queued CHECK");
+        ota_check_manifest();      // publishes its own outcome
+    }
 }
 
 // ---- ElegantOTA integration ---------------------------------

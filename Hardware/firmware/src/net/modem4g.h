@@ -55,3 +55,4 @@ bool   modem4g_call(const char* number);
 // Access the underlying TinyGSM client (owned by uplink module)
 class Client;
 Client* modem4g_get_client();
+Client* modem4g_get_http_client();  // separate mux for HTTP (not shared with MQTT)

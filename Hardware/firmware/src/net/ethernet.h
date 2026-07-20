@@ -16,3 +16,4 @@ bool eth_signal_ok();   // link detection
 
 class Client;
 Client* eth_get_client();
+Client* eth_get_http_client();  // separate socket for HTTP (not shared with MQTT)

@@ -21,7 +21,8 @@
 #include <esp_task_wdt.h>
 
 static TinyGsm       s_modem(Serial1);
-static TinyGsmClient s_client(s_modem);
+static TinyGsmClient s_client(s_modem, 0);      // MQTT — mux 0
+static TinyGsmClient s_httpClient(s_modem, 1);  // HTTP/api — mux 1 (separate socket)
 
 static Modem4gState  s_state        = Modem4gState::OFF;
 static uint32_t      s_stateTs      = 0;   // millis() when we entered current state
@@ -370,4 +371,5 @@ String modem4g_send_sms_diag(const char* number, const char* text) {
     return "send failed (no CMS code)";
 }
 
-Client* modem4g_get_client() { return &s_client; }
+Client* modem4g_get_client()      { return &s_client; }
+Client* modem4g_get_http_client() { return &s_httpClient; }

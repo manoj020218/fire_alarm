@@ -8,6 +8,7 @@
 #include "uplink.h"
 #include "../config/config.h"
 #include "../config/defaults.h"
+#include "../config/build_info.h"
 #include "../util/log.h"
 #include <ArduinoHttpClient.h>
 #include <Preferences.h>
@@ -140,7 +141,7 @@ ApiResponse api_get(const char* path) {
     char fullPath[192];
     build_path(path, fullPath, sizeof(fullPath));
 
-    HttpClient http(uplink_get_client(), host, port);
+    HttpClient http(uplink_get_http_client(), host, port);
     http.setTimeout(HTTP_CLIENT_TIMEOUT_MS);
     http.connectionKeepAlive();  // reuse TCP if transport supports it
 
@@ -154,6 +155,7 @@ ApiResponse api_get(const char* path) {
     int code = http.responseStatusCode();
     resp.status = code;
     if (code > 0) {
+        http.skipResponseHeaders();   // MUST skip headers or the body buffer gets them
         drain_body(http, resp.body, sizeof(resp.body));
     } else {
         snprintf(resp.body, sizeof(resp.body), "err=%d", code);
@@ -162,6 +164,26 @@ ApiResponse api_get(const char* path) {
 
     LOG_D("API", "GET %s%s -> %d", host, fullPath, resp.status);
     return resp;
+}
+
+// ---- Register device token with VPS -------------------------
+// POST /api/fireguard/register {gatewayId, token, hw, fw}
+// Teaches the VPS this gateway's self-generated token so /backup (and other
+// device-authed calls) will authenticate. Idempotent on the backend.
+bool api_register() {
+    GatewayConfig& cfg = getConfig();
+    char body[256];
+    snprintf(body, sizeof(body),
+             "{\"gatewayId\":\"%s\",\"token\":\"%s\",\"hw\":\"%s\",\"fw\":\"%s\"}",
+             cfg.gatewayId, api_get_token(), HW_REVISION, FW_VERSION);
+
+    ApiResponse resp = api_post("/register", body);
+    if (resp.status == 200) {
+        LOG_I("API", "Registered with VPS (token accepted)");
+        return true;
+    }
+    LOG_W("API", "Register failed: HTTP %d %s", resp.status, resp.body);
+    return false;
 }
 
 // ---- POST ---------------------------------------------------
@@ -183,7 +205,7 @@ ApiResponse api_post(const char* path, const char* jsonBody) {
 
     size_t bodyLen = strlen(jsonBody);
 
-    HttpClient http(uplink_get_client(), host, port);
+    HttpClient http(uplink_get_http_client(), host, port);
     http.setTimeout(HTTP_CLIENT_TIMEOUT_MS);
     http.connectionKeepAlive();
 
@@ -201,6 +223,7 @@ ApiResponse api_post(const char* path, const char* jsonBody) {
     int code = http.responseStatusCode();
     resp.status = code;
     if (code > 0) {
+        http.skipResponseHeaders();   // MUST skip headers or the body buffer gets them
         drain_body(http, resp.body, sizeof(resp.body));
     } else {
         snprintf(resp.body, sizeof(resp.body), "err=%d", code);

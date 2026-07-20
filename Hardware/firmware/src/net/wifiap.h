@@ -14,3 +14,4 @@ int  wifi_rssi();
 
 class Client;
 Client* wifi_get_client();
+Client* wifi_get_http_client();  // separate socket for HTTP (not shared with MQTT)

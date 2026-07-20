@@ -15,7 +15,8 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 
-static WiFiClient s_client;
+static WiFiClient s_client;      // MQTT (persistent connection)
+static WiFiClient s_httpClient;  // HTTP/api calls — MUST be separate from MQTT's
 static bool       s_staUp  = false;
 static bool       s_apUp   = false;
 
@@ -60,4 +61,5 @@ int wifi_rssi() {
     return wifi_sta_connected() ? (int)WiFi.RSSI() : 0;
 }
 
-Client* wifi_get_client() { return &s_client; }
+Client* wifi_get_client()      { return &s_client; }
+Client* wifi_get_http_client() { return &s_httpClient; }

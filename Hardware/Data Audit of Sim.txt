@@ -1,0 +1,64 @@
+Findings
+
+  - Critical: The 4G state machine is not actually running “each loop tick”; it only advances when a 30 s scheduler
+    fires. See /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/uplink.cpp:86 and /D:/IOT Device/
+    fireguard/fireguard v1/Hardware/firmware/src/config/defaults.h:40. That stretches a 1.2 s PWR_KEY hold into about 30
+    s, delays the first AT probe to about 60 s, gives only two network polls before timeout, and turns retries into
+    multi-minute cycles. This alone can stop normal registration.
+  - Critical: The hardware is A7672S, but the build is forced to TINY_GSM_MODEM_SIM7600 in both /D:/IOT Device/
+    fireguard/fireguard v1/Hardware/firmware/platformio.ini:21 and /D:/IOT Device/fireguard/fireguard v1/Hardware/
+    firmware/src/net/modem4g.cpp:15. The bundled TinyGSM already has a dedicated A7672X driver at /D:/IOT Device/
+    fireguard/fireguard v1/Hardware/firmware/.pio/libdeps/fireguard/TinyGSM/src/TinyGsmClient.h:125. The SIM7600 path
+    checks registration via CGREG and uses a different PDP/socket attach flow at /D:/IOT Device/fireguard/fireguard v1/
+    Hardware/firmware/.pio/libdeps/fireguard/TinyGSM/src/TinyGsmClientSIM7600.h:238, while the A7672X path uses a
+    different attach sequence at /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/.pio/libdeps/fireguard/TinyGSM/
+    src/TinyGsmClientA7672x.h:339. That mismatch is a real root cause for false “not registered” state and failed data
+    bring-up.
+  - High: The firmware hides operator and signal until full PDP connect. modem4g_operator() returns "N/A" unless state
+    is CONNECTED, and modem4g_signal_dbm() returns 0 unless CONNECTED; see /D:/IOT Device/fireguard/fireguard v1/
+    Hardware/firmware/src/net/modem4g.cpp:181. But SIM info publishes operator before it checks registered; see /D:/IOT
+    Device/fireguard/fireguard v1/Hardware/firmware/src/sim/simsvc.cpp:31. So “operator not fetching” is partly a
+    software reporting defect, not proof of no network registration.
+  - High: APN and RAT defaults are unsafe for a field fire-alarm product. APN defaults to blank in /D:/IOT Device/
+    fireguard/fireguard v1/Hardware/firmware/src/config/defaults.h:29, LTE-only defaults to false in /D:/IOT Device/
+    fireguard/fireguard v1/Hardware/firmware/src/config/defaults.h:68, and the modem code itself says JIO needs the APN
+    preloaded before LTE attach at /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/modem4g.cpp:99. If
+    APN is blank, or if a JIO SIM is left in auto RAT mode, data attach can fail even if the SIM is otherwise valid.
+  - High: There is no SIM readiness gate before registration. The app code goes from testAT() straight to RAT/APN setup
+    and network wait in /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/modem4g.cpp:84. A codebase
+    search found no app-side call to init(), getSimStatus(), or simUnlock() in src/. That means no explicit handling for
+    CPIN, slow SIM enumeration, SIM removed/inserted, or hot-insert behavior.
+  - High: If WiFi or LAN becomes active first, 4G warm-standby can stop progressing. modem4g_step() is only called
+    inside probe_transports(), and probe_transports() is only called when the current transport is not alive; see /D:/
+    IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/uplink.cpp:39 and /D:/IOT Device/fireguard/fireguard v1/
+    Hardware/firmware/src/net/uplink.cpp:99. For a fire-alarm device, backup cellular should stay registered even when
+    LAN/WiFi is working.
+  - Medium: SIM diagnostics are operationally weak when cellular is broken. SIM commands are accepted only from MQTT
+    at /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/mqttc/mqtt.cpp:60 and results are published only back
+    to MQTT at /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/sim/simsvc.cpp:26. When cellular data is
+    down, your main SIM debug channel disappears with it.
+  - Medium: Even after fixing cadence, the initial registration budget is still too short for field conditions. The code
+    times out network registration after 60 s at /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/
+    modem4g.cpp:35, while the bundled TinyGSM guidance says first attach can take many minutes at /D:/IOT Device/
+    fireguard/fireguard v1/Hardware/firmware/.pio/libdeps/fireguard/TinyGSM/README.md:310.
+
+  What To Correct
+
+  1. Fix the modem identity first: build and code must use the A7672X TinyGSM profile, not SIM7600.
+  2. Decouple modem bring-up from uplink selection: run the modem state machine continuously, on a short cadence,
+     independent of the 30 s transport preference check.
+  3. Add a real SIM gate before registration: SIM_READY, CPIN, SIM removed, SIM inserted, and explicit reattach
+     handling.
+  4. Stop gating operator/signal on PDP connection. Expose raw CPIN, CREG, CGREG, CEREG, COPS, CSQ, CGATT, CGDCONT, and
+     IP status locally.
+  5. Treat APN and RAT as mandatory production provisioning, not optional. For operator-specific SIMs, preload correct
+     APN and LTE mode before attach.
+  6. Keep 4G warm even when LAN/WiFi is active, so SMS/call backup and fast failover remain available.
+  7. Add a local SIM diagnostics endpoint or serial diagnostics path; do not depend on MQTT to debug why MQTT cannot
+     come up.
+  8. Increase first-attach timeout to minutes, not 60 s, and do not power-cycle the modem during a valid long operator
+     search.
+
+  From code alone, the two biggest real causes are the broken 30-second state-machine cadence and the wrong TinyGSM
+  modem profile. Those are sufficient to explain all three symptoms: no apparent registration, no operator shown, and no
+  cellular data path for MQTT/VPS.

@@ -1,0 +1,58 @@
+
+• Findings
+
+  1. The current OTA flow is hard-blocked by the backup gate, and the live VPS is rejecting unknown devices. The
+     firmware always does POST /api/fireguard/backup before applying an update (/D:/IOT Device/fireguard/fireguard v1/
+     Hardware/firmware/src/ota/ota.cpp:245, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/ota/
+     ota.cpp:261, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/ota/ota.cpp:507). Device auth is a locally
+     generated token sent as X-Gateway-Id and X-Gateway-Token (/D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/
+     src/net/apiclient.cpp:20, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/apiclient.cpp:149, /D:/
+     IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/apiclient.cpp:150). I verified the live VPS on July 20,
+     2026: manifest is available, but POST /api/fireguard/backup returns
+     {"ok":false,"code":"UNAUTHORIZED","message":"Unknown gateway"} for an unregistered gateway. I do not see any
+     firmware path that registers this generated token with the VPS; it is only exposed in the WebUI (/D:/IOT Device/
+     fireguard/fireguard v1/Hardware/firmware/src/webui/handlers_config.cpp:78). This is the strongest current root
+     cause.
+  2. A remote MQTT update command is not sufficient by itself. The firmware’s update handler calls ota_begin_update()
+     directly (/D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/mqttc/mqtt.cpp:37, /D:/IOT Device/fireguard/
+     fireguard v1/Hardware/firmware/src/mqttc/mqtt.cpp:38), but ota_begin_update() immediately exits if no prior
+     manifest check has populated s_updateAvail (/D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/ota/
+     ota.cpp:153, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/ota/ota.cpp:503). So VPS must first
+     trigger a manifest check, or the device must already have done one.
+  3. The first automatic manifest check does not happen at boot; it happens only after 24 hours of uptime. tOta starts
+     as {0, OTA_CHECK_INTERVAL_MS} with a 24-hour interval (/D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/
+     main.cpp:40, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/config/defaults.h:41), and nothing calls
+     task_trigger_now(tOta). The loop only checks OTA when that timer expires (/D:/IOT Device/fireguard/fireguard v1/
+     Hardware/firmware/src/main.cpp:402, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/main.cpp:404). On a
+     freshly rebooted device, a VPS update push can therefore be a no-op for up to 24 hours unless it first sends
+     {"cmd":"check"}.
+  4. Your field doc and the firmware disagree on the MQTT topic. The doc says OTA can be triggered via MQTT command ->
+     {"cmd":"update"} (/D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/FIRMWARE_UPLOAD.md:69), but the firmware
+     listens for OTA commands on the dedicated ota topic, not command (/D:/IOT Device/fireguard/fireguard v1/Hardware/
+     firmware/src/mqttc/mqtt.cpp:29, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/mqttc/mqtt.cpp:99, /D:/
+     IOT Device/fireguard/fireguard v1/Hardware/firmware/src/mqttc/topics.h:30, /D:/IOT Device/fireguard/fireguard v1/
+     Hardware/firmware/src/mqttc/topics.h:31). If the VPS is publishing to command, OTA will never start.
+  5. Even a successful download can still roll back if MQTT/uplink do not come back within 5 minutes after reboot.
+     Validation only completes once both mqtt_connected() and uplink_is_up() are true (/D:/IOT Device/fireguard/
+     fireguard v1/Hardware/firmware/src/main.cpp:429, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/
+     main.cpp:430); otherwise the firmware auto-rolls back after OTA_VALIDATE_WINDOW_MS (/D:/IOT Device/fireguard/
+     fireguard v1/Hardware/firmware/src/ota/ota.cpp:80, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/ota/
+     ota.cpp:97, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/config/defaults.h:71). That makes OTA
+     success depend on cloud connectivity, not just firmware health.
+  6. Failed backup attempts are lossy. The backup builder drains up to 10 SD-buffered records into the backup payload (/
+     D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/ota/ota.cpp:222, /D:/IOT Device/fireguard/fireguard v1/
+     Hardware/firmware/src/ota/ota.cpp:226), and sdbuf_replay_next() removes them from disk as it reads them (/D:/IOT
+     Device/fireguard/fireguard v1/Hardware/firmware/src/store/sdbuffer.cpp:5, /D:/IOT Device/fireguard/fireguard v1/
+     Hardware/firmware/src/store/sdbuffer.cpp:76). If /backup then fails, those records are already gone.
+  7. There are secondary design risks, not today’s root cause: version comparison uses strcmp() instead of semantic
+     version parsing (/D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/ota/ota.cpp:144), and the API client
+     claims http(s) support while actually using plain HttpClient over a raw Client (/D:/IOT Device/fireguard/fireguard
+     v1/Hardware/firmware/src/net/apiclient.h:4, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/
+     apiclient.cpp:70, /D:/IOT Device/fireguard/fireguard v1/Hardware/firmware/src/net/apiclient.cpp:143). Current live
+     manifest/download URLs are plain HTTP, so this is future risk, not the current blocker.
+
+  Most likely current reason VPS OTA is failing
+  The device can see the live manifest and the binary artifact is present, but OTA cannot proceed because the mandatory
+  backup call is being rejected as Unknown gateway. The firmware generates its own token locally and I do not see any
+  registration handshake that would teach the VPS that gatewayId/token pair. Separately, if the VPS is sending only
+  {"cmd":"update"} or is publishing that payload to command instead of ota, the update will also not start.

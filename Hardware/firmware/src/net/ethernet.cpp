@@ -19,7 +19,8 @@
 #include <SPI.h>
 
 static uint8_t      s_mac[6];
-static EthernetClient s_client;
+static EthernetClient s_client;       // MQTT
+static EthernetClient s_httpClient;   // HTTP/api — separate socket from MQTT
 
 enum class EthState : uint8_t {
     UNINIT = 0,
@@ -159,4 +160,5 @@ bool eth_signal_ok() {
            Ethernet.linkStatus() == LinkON;
 }
 
-Client* eth_get_client() { return &s_client; }
+Client* eth_get_client()      { return &s_client; }
+Client* eth_get_http_client() { return &s_httpClient; }

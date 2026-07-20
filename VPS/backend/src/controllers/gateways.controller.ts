@@ -10,7 +10,7 @@ import { Site } from '../models/Site';
 import { env } from '../config/env';
 import { notifyBillingActivation } from '../services/billingBridge';
 import { writeAudit } from '../services/audit.service';
-import { publishGatewayConfig, publishGatewayCommand } from '../services/deviceCommand.service';
+import { publishGatewayConfig, publishGatewayCommand, publishGatewayOta } from '../services/deviceCommand.service';
 import { scopeFilter, canAccessSite } from '../utils/scope';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -203,6 +203,40 @@ export const sendGatewayCommand = asyncHandler(
     res.json({ ok: true, gatewayId: id, command: cmd });
   }
 );
+
+// ── POST /api/gateways/:id/ota ───────────────────────────────────────────────
+// Remotely trigger OTA over MQTT. body.action = 'check' | 'update' (default
+// 'update'; firmware does check-then-apply). Publishes to the `ota` topic.
+export const triggerOta = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as { id: string };
+  const action = ((req.body as { action?: string })?.action ?? 'update') === 'check'
+    ? 'check'
+    : 'update';
+
+  const gateway = await Gateway.findOne({ gatewayId: id });
+  if (!gateway) throw AppError.notFound('Gateway');
+  if (!canAccessSite(req.user, gateway.siteId)) throw AppError.forbidden();
+
+  // Publish on BOTH the dedicated `ota` topic and the proven-reliable `command`
+  // topic. The firmware queues either into the same deferred OTA service, so a
+  // duplicate is harmless (idempotent flag) — this maximizes delivery.
+  publishGatewayOta(id, gateway.siteId, action);
+  publishGatewayCommand(id, gateway.siteId, {
+    command: action === 'check' ? 'ota_check' : 'ota_update',
+    issuedAt: new Date().toISOString(),
+  });
+
+  await writeAudit({
+    action: 'CONFIG_CHANGE',
+    entity: 'Gateway',
+    entityId: id,
+    after: { ota: action },
+    req,
+  });
+
+  res.json({ ok: true, gatewayId: id, ota: action });
+});
 
 // ── POST /api/gateways/:id/token ─────────────────────────────────────────────
 

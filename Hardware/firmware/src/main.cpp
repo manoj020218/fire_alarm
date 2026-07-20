@@ -42,6 +42,11 @@ static Task tLed        = {0, 500};     // status LED heartbeat
 static Task tTimeSync   = {0, 3600000UL}; // try time sync hourly (rtc_maybe_sync guards 23h)
 static Task tReboot     = {0, 60000};  // auto-reboot check every minute
 static Task tDi1Guard   = {0, 100};    // DI1 long-press factory reset detector
+static Task tRegister   = {0, 15000};  // retry VPS device-token registration
+
+// One-time VPS registration state (teaches backend our self-generated token).
+static bool s_registered    = false;
+static bool s_bootOtaChecked = false;
 
 // ---- LED heartbeat ------------------------------------------
 static bool s_ledState = false;
@@ -398,6 +403,24 @@ void loop() {
         publish_status();
     }
 
+    // VPS registration (one-time): teach the backend our device token so
+    // /backup and other device-authed calls authenticate. Retries until the
+    // uplink is up and the backend accepts; then does a boot-time OTA check so
+    // a cloud push isn't blind for up to 24 h.
+    if (!s_registered && task_due(tRegister)) {
+        if (uplink_is_up() && api_register()) {
+            s_registered = true;
+            if (!s_bootOtaChecked) {
+                ota_request_check();   // boot check (deferred, runs in ota_service)
+                s_bootOtaChecked = true;
+            }
+        }
+    }
+
+    // Service any queued OTA work (check / update). Runs the blocking HTTP here
+    // on the loop task — never on the MQTT callback or WebServer async task.
+    ota_service();
+
     // OTA periodic manifest check
     if (task_due(tOta)) {
         tOta.intervalMs = getConfig().otaCheckIntervalMs;
@@ -424,9 +447,12 @@ void loop() {
         check_factory_reset_pin();
     }
 
-    // OTA mark valid once everything is stable
+    // OTA mark valid once the new image proves it can bring up an uplink.
+    // (D5) Accept uplink-only — do NOT require mqtt_connected(): over a flaky
+    // SIM the broker can take minutes to reconnect after reboot, and requiring
+    // it would auto-roll-back a perfectly healthy image.
     static bool s_validated = false;
-    if (!s_validated && mqtt_connected() && uplink_is_up()) {
+    if (!s_validated && uplink_is_up()) {
         ota_mark_valid();
         s_validated = true;
     }

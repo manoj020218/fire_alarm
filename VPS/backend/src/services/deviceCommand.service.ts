@@ -30,7 +30,9 @@ export interface GatewayCommandPayload {
     | 'read_sms'
     | 'ussd'
     | 'test_sms'
-    | 'test_call';
+    | 'test_call'
+    | 'ota_check'
+    | 'ota_update';
   params?: Record<string, unknown>;
   issuedAt: string;
 }
@@ -61,4 +63,20 @@ export function publishGatewayCommand(
   const topic = `fireguard/${siteId}/${gatewayId}/command`;
   logger.info({ gatewayId, siteId, cmd, topic }, 'Publishing gateway command');
   mqttPublish(topic, JSON.stringify(cmd), 1);
+}
+
+/**
+ * Publish an OTA command to device.
+ * Topic: fireguard/{siteId}/{gatewayId}/ota  — NOTE: the firmware listens on the
+ * dedicated `ota` topic, NOT `command`. Payload: {"cmd":"check"} | {"cmd":"update"}.
+ * The firmware treats `update` as check-then-apply, so a single `update` is enough.
+ */
+export function publishGatewayOta(
+  gatewayId: string,
+  siteId: string,
+  action: 'check' | 'update'
+): void {
+  const topic = `fireguard/${siteId}/${gatewayId}/ota`;
+  logger.info({ gatewayId, siteId, action, topic }, 'Publishing gateway OTA command');
+  mqttPublish(topic, JSON.stringify({ cmd: action }), 1);
 }

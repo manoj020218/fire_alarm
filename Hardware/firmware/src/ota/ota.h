@@ -29,6 +29,15 @@ void ota_validation_tick();
 // Periodic manifest check (call from scheduler).
 OtaResult ota_check_manifest();
 
+// ── Deferred/serialized OTA (safe from MQTT callback & WebUI async task) ──────
+// These only SET a request flag; the heavy blocking work (HTTP fetch, 1 MB
+// download) runs later in ota_service(), on the main loop task, serialized with
+// mqtt_loop(). This avoids a stack overflow / shared-Client conflict that
+// crashes the device when OTA is run inline from a callback.
+void ota_request_check();   // queue a manifest check
+void ota_request_update();  // queue check-then-apply
+void ota_service();         // call every loop() iteration; runs any queued work
+
 // True if a newer version was found by check_manifest() but not yet applied.
 bool ota_update_available();
 

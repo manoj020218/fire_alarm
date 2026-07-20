@@ -23,6 +23,11 @@ ApiResponse api_get(const char* path);
 // body must be null-terminated JSON string.
 ApiResponse api_post(const char* path, const char* jsonBody);
 
+// Register this gateway's self-generated device token with the VPS so that
+// device-authed endpoints (e.g. /backup) accept it. Idempotent; safe to retry.
+// Returns true on HTTP 200. Must be called after uplink is up.
+bool api_register();
+
 // Token management (NVS key "fg_tok")
 // Generated on first boot (32 hex chars), never reset on config_save().
 const char* api_get_token();      // returns token string (persists across calls)

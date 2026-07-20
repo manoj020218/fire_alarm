@@ -22,6 +22,7 @@ import pushRoutes from './routes/push.routes';
 // ── Phase 2C route imports ────────────────────────────────────────────────────
 import fireguardDeviceRoutes from './routes/device.routes';
 import otaPublicRoutes from './routes/otaPublic.routes';
+import registerRoutes from './routes/register.routes';
 // ── Billing wiring (Part B) ──────────────────────────────────────────────────
 import bridgeRoutes from './routes/bridge.routes';
 import subscriptionRoutes from './routes/subscription.routes';
@@ -70,6 +71,10 @@ export function createApp(): Express {
 
   // Public OTA (no device auth; SHA-256 verified) — must precede the device router
   app.use('/api/fireguard/ota', otaPublicRoutes);
+
+  // Public device self-registration (establishes the device token) — must also
+  // precede the device-auth router.
+  app.use('/api/fireguard/register', registerRoutes);
 
   // Phase 2C: device HTTP contract (gateway device auth — NEVER gated)
   app.use('/api/fireguard', fireguardDeviceRoutes);
