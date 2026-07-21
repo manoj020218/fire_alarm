@@ -7,6 +7,7 @@
 #include "mqtt.h"
 #include "topics.h"
 #include "../net/uplink.h"
+#include "../net/modem4g.h"
 #include "../net/apiclient.h"
 #include "../config/config.h"
 #include "../config/build_info.h"
@@ -171,11 +172,23 @@ static bool do_connect() {
     } else {
         s_lastFailRc = s_mqtt.state();
         LOG_W("MQTT", "Connect failed rc=%d over %s", s_lastFailRc, uplink_type_str());
-        // Can't reach the broker over the active transport — after a few tries,
-        // tell the uplink manager to fail over to another transport.
-        if (++s_connectFails >= 4) {
-            s_connectFails = 0;
-            uplink_report_cloud_fail();
+        // On 4G, hand the rc to the modem so it can repair the SIM data path
+        // (it classifies the code and runs its recovery ladder — PDP-attached does
+        // NOT mean the broker socket can open).
+        if (uplink_active_type() == UplinkType::G4) {
+            modem4g_report_broker_fail(s_lastFailRc);
+        }
+        // Classify the failure (CODEX): only a TRANSPORT failure means "this uplink
+        // can't reach the broker" → fail over to another transport.
+        //   -2 MQTT_CONNECT_FAILED (socket)  -4 MQTT_CONNECTION_TIMEOUT  → transport
+        //    4/5 credentials/unauthorized, 3 unavailable  → NOT a transport problem
+        if (s_lastFailRc == -2 || s_lastFailRc == -4) {
+            if (++s_connectFails >= 4) {
+                s_connectFails = 0;
+                uplink_report_cloud_fail();
+            }
+        } else {
+            s_connectFails = 0;   // auth/broker issue — don't blacklist the transport
         }
     }
     return ok;

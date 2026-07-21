@@ -27,6 +27,7 @@ static uint32_t s_gprsRetryTs = 0;
 static uint8_t s_regRecoveryStage = 0;
 static uint8_t s_dataRecoveryStage = 0;
 static char s_effectiveApn[32] = {0};
+static uint32_t s_lastBrokerRecoveryMs = 0;
 
 #define POWERING_HOLD_MS       1200
 #define POWERING_SETTLE_MS     3000
@@ -64,12 +65,14 @@ static void enter(Modem4gState ns) {
     if (ns == Modem4gState::CONNECTED) {
         s_regRecoveryStage = 0;
         s_dataRecoveryStage = 0;
+        s_lastBrokerRecoveryMs = 0;
     }
     if (ns == Modem4gState::OFF) {
         s_regRecoveryStage = 0;
         s_dataRecoveryStage = 0;
         s_effectiveApn[0] = 0;
         s_runtimeLteOnly = false;
+        s_lastBrokerRecoveryMs = 0;
     }
 }
 
@@ -164,7 +167,24 @@ static void reset_data_plane() {
 // context (CGATT) is up — without NETOPEN every socket connect fails, which is why
 // MQTT+HTTP both failed over 4G on JIO AND Airtel. Best-effort: issue it and move
 // on (if already open, the modem returns a harmless error).
-static void ensure_data_service() {
+static bool data_service_is_open() {
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+NETOPEN?"));
+    int rsp = s_modem.waitResponse(3000L, GF("+NETOPEN: 1"), GF("+NETOPEN: 0"),
+                                   GF("ERROR"));
+    s_modem.waitResponse(300L);
+    esp_task_wdt_reset();
+    return rsp == 1;
+}
+
+static void close_data_service() {
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+NETCLOSE"));
+    s_modem.waitResponse(12000L);
+    esp_task_wdt_reset();
+}
+
+static void ensure_data_service_legacy() {
     esp_task_wdt_reset();
     String r;
     s_modem.sendAT(GF("+NETOPEN?"));
@@ -175,6 +195,27 @@ static void ensure_data_service() {
         LOG_I("4G", "NETOPEN issued (TCP/IP service)");
     }
     esp_task_wdt_reset();
+}
+
+static bool ensure_data_service() {
+    if (data_service_is_open()) return true;
+
+    LOG_I("4G", "Opening TCP/IP service (NETOPEN)");
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+NETOPEN"));
+    s_modem.waitResponse(12000L);
+    esp_task_wdt_reset();
+    if (data_service_is_open()) return true;
+
+    LOG_W("4G", "NETOPEN did not verify - restarting TCP/IP service");
+    close_data_service();
+    s_modem.sendAT(GF("+NETOPEN"));
+    s_modem.waitResponse(12000L);
+    esp_task_wdt_reset();
+    if (data_service_is_open()) return true;
+
+    LOG_W("4G", "NETOPEN still not verified");
+    return false;
 }
 
 static void auto_select_operator() {
@@ -215,14 +256,21 @@ static void recover_registration(const char* requestedApn) {
 static void recover_data_attach() {
     if (s_dataRecoveryStage == 0) {
         s_dataRecoveryStage = 1;
-        LOG_W("4G", "Data attach failed - resetting PDP session");
-        reset_data_plane();
-        enter(Modem4gState::WAIT_NETWORK);
+        LOG_W("4G", "Data path recovery stage 1 - restarting TCP/IP service");
+        close_data_service();
+        enter(Modem4gState::CONNECTING_GPRS);
         return;
     }
     if (s_dataRecoveryStage == 1) {
         s_dataRecoveryStage = 2;
-        LOG_W("4G", "Data attach failed - resetting PDP and reselecting operator");
+        LOG_W("4G", "Data path recovery stage 2 - resetting PDP session");
+        reset_data_plane();
+        enter(Modem4gState::WAIT_NETWORK);
+        return;
+    }
+    if (s_dataRecoveryStage == 2) {
+        s_dataRecoveryStage = 3;
+        LOG_W("4G", "Data path recovery stage 3 - resetting PDP and reselecting operator");
         reset_data_plane();
         auto_select_operator();
         enter(Modem4gState::WAIT_AT);
@@ -356,11 +404,15 @@ Modem4gState modem4g_step(const char* apn) {
         case Modem4gState::CONNECTING_GPRS:
             esp_task_wdt_reset();
             if (s_modem.isGprsConnected()) {
-                ensure_data_service();   // open NETOPEN before declaring connected
-                LOG_I("4G", "Data active - IP %s Signal %d dBm Op %s",
-                      s_modem.localIP().toString().c_str(),
-                      modem4g_signal_dbm(), modem4g_operator().c_str());
-                enter(Modem4gState::CONNECTED);
+                if (ensure_data_service()) {
+                    LOG_I("4G", "Data active - IP %s Signal %d dBm Op %s",
+                          s_modem.localIP().toString().c_str(),
+                          modem4g_signal_dbm(), modem4g_operator().c_str());
+                    enter(Modem4gState::CONNECTED);
+                } else {
+                    LOG_W("4G", "PDP attached but TCP/IP service not verified");
+                    recover_data_attach();
+                }
                 break;
             }
             if (s_gprsRetryTs == 0 || (millis() - s_gprsRetryTs) > 5000) {
@@ -375,11 +427,15 @@ Modem4gState modem4g_step(const char* apn) {
                 bool ok = s_modem.gprsConnect(selectedApn, "", "");
                 esp_task_wdt_reset();
                 if (ok || s_modem.isGprsConnected()) {
-                    ensure_data_service();   // open NETOPEN before declaring connected
-                    LOG_I("4G", "Data connected. IP %s Signal %d dBm Op %s",
-                          s_modem.localIP().toString().c_str(),
-                          modem4g_signal_dbm(), modem4g_operator().c_str());
-                    enter(Modem4gState::CONNECTED);
+                    if (ensure_data_service()) {
+                        LOG_I("4G", "Data connected. IP %s Signal %d dBm Op %s",
+                              s_modem.localIP().toString().c_str(),
+                              modem4g_signal_dbm(), modem4g_operator().c_str());
+                        enter(Modem4gState::CONNECTED);
+                    } else {
+                        LOG_W("4G", "PDP up but TCP/IP service still not verified");
+                        recover_data_attach();
+                    }
                     break;
                 }
                 LOG_W("4G", "Data attach attempt failed - will retry");
@@ -429,6 +485,16 @@ void modem4g_maintain() {
         LOG_W("4G", "GPRS dropped - starting recovery");
         recover_data_attach();
     }
+}
+
+void modem4g_report_broker_fail(int mqttRc) {
+    if (s_state != Modem4gState::CONNECTED) return;
+    if (mqttRc != -2 && mqttRc != -4) return;
+    if (s_lastBrokerRecoveryMs != 0 &&
+        (millis() - s_lastBrokerRecoveryMs) < 20000UL) return;
+    s_lastBrokerRecoveryMs = millis();
+    LOG_W("4G", "Broker connect failed rc=%d - starting data-path recovery", mqttRc);
+    recover_data_attach();
 }
 
 int modem4g_signal_dbm() {

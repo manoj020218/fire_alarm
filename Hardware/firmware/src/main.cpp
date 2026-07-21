@@ -221,7 +221,7 @@ static void publish_telemetry() {
     sys["signalLan"] = uplink_signal_lan();
     sys["rssi"]      = uplink_signal_4g_dbm();
     sys["mqtt"]      = mqtt_connected() ? "connected" : "disconnected";
-    sys["cloud"]     = uplink_is_up()   ? "online"    : "offline";
+    sys["cloud"]     = mqtt_connected() ? "online"    : "offline";  // real broker reachability, not just uplink presence
     sys["rs485"]     = modbus_is_bus_ok() ? "ok"       : "error";
     sys["wifi"]      = (strcmp(uplink_type_str(), "wifi") == 0) ? "online" : "offline";
 

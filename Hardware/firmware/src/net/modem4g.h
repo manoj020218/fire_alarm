@@ -19,6 +19,7 @@ enum class Modem4gState : uint8_t {
 Modem4gState modem4g_step(const char* apn);
 bool modem4g_is_connected();
 void modem4g_maintain();
+void modem4g_report_broker_fail(int mqttRc);
 
 int modem4g_signal_dbm();
 String modem4g_operator();
