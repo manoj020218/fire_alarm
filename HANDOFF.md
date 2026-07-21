@@ -66,11 +66,48 @@ gateway: ota:update_available 1.0.9→1.1.0
 `JNX-FG-08F6` / SITE001 / token `71993834c22678b0eaaf3e49036d83e1` (now auto-registered).
 SIM inserted (`+919928…`), signal ~26-28 but `registered:false` (tomorrow's fix).
 
+## SIM DATA UPLINK — HANDOFF STATE (2026-07-21, for CODEX / restore point)
+Device is on **fw 1.1.7** (JNX-FG-08F6, JIO SIM, LTE-only + APN jionet). All changes ship via OTA.
+Refs: `SIM_UPLINK_PLAN.md`, `MNC MCC.txt` (A7672S AT sequence — confirmed accurate).
+
+**DONE & proven on hardware:**
+- Modem profile SIM7600→**A7672X** (`platformio.ini`, `modem4g.cpp`) — JIO LTE **data attach did
+  reach `modem:connected`** on 1.1.2 (SIM7600 never did).
+- Registration via **CREG/CEREG** (accept stat 1/5), not `isNetworkConnected()`/CGREG (false on
+  JIO LTE-only). Modem state machine driven ~1.5s (not every-30s, not every-loop).
+- Modem is **stable** now (steady −65 dBm, no `no_at` flapping) after removing the destructive
+  power-cycle (A7672 PWR_KEY is a **TOGGLE** — FAILED→OFF→POWERING was turning the modem OFF).
+- **Preemptive uplink** (`uplink.cpp` `probe_transports` 4G>WiFi>LAN + always-probe) so 4G takes
+  over WiFi; **MQTT re-binds** to the new transport on switch (`mqtt.cpp` `s_lastUplink`).
+- **Observability:** status telemetry `modem` field = off/powering/wait_at/wait_net/connecting/
+  connected/**failed:no_at|failed:gprs**. `signal4g`/`operator` shown once AT-ready (not only CONNECTED).
+
+**CURRENT BLOCKER (where CODEX picks up):** JIO **PDP/data attach** (`gprsConnect` in
+`modem4g.cpp` CONNECTING_GPRS) doesn't complete *consistently/quickly*. Diagnostic showed
+`failed:gprs` (registered OK, attach fails), then after removing the power-cycle the modem got
+**wedged in `wait_net`** (registration lost, `sim_info` stops responding) because there is now NO
+"restart modem as last resort" — the recovery ladder is incomplete. A clean power-off clears it.
+
+**NEXT STEPS (recommended order):**
+1. **Recovery ladder** (`MNC MCC.txt` §recovery): retry attach without power-cycle for N minutes,
+   THEN one proper full modem power-cycle (PWR_KEY off→wait→on) as LAST resort. Make POWERING
+   check `testAT()` first and only pulse PWR_KEY if the modem is actually off (avoid toggling a
+   live modem).
+2. **Serial trace** to see the real AT exchange: `pio device monitor -p COM12 -b 115200
+   --filter log2file` (writes to file, won't hang the terminal). Look at CREG/CEREG/COPS/CGATT/
+   CGACT/CGPADDR responses during CONNECTING.
+3. Consider the doc's **explicit attach**: `CGATT=1` → `CGACT=1,1` → check `CGPADDR/IPADDR`
+   instead of relying on TinyGSM `gprsConnect` (which may mishandle JIO's already-active bearer).
+4. **Try Airtel SIM** (auto 2G/3G/4G) — far easier than JIO LTE-only; owner may standardize on it.
+5. Then the plan's polish: **auto-APN by PLMN** (COPS? → lookup), **configurable priority**
+   (dashboard/config-set), **data-usage counters**, CPIN gate, local SIM diagnostics.
+
+**AT contention note:** `modem4g_step` (every 1.5s) and `simsvc` SIM commands share `s_modem`;
+during CONNECTING the ~10s blocking `gprsConnect` starves `sim_info`. A small mutex/"modem busy"
+guard would help.
+
 ## Open items
-1. **SIM data uplink overhaul** (tomorrow) — `SIM_UPLINK_PLAN.md`: A7672X modem profile (not
-   SIM7600), continuous modem cadence, **configurable per-gateway priority** (dashboard-set via
-   config/set; default SIM-first `4G>WiFi>LAN`; hold-down + keep-4G-warm), longer attach,
-   raw modem status, local SIM diagnostics. Deliver via OTA.
+1. **SIM data uplink** — see the detailed handoff state above; `SIM_UPLINK_PLAN.md` for the full plan.
 2. **Multi-protocol capture + LAN WebUI roadmap** — `LAN_DEVICE_CAPTURE.md`: add **Modbus TCP**
    device polling (reuses the RS485 register-map pipeline; UI gains conn-type RS485|TCP + IP:port);
    move W5500 to ESP-IDF **`ETH.h`/lwIP** so the WebUI is reachable over the Ethernet LAN IP (not

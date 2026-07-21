@@ -1,0 +1,611 @@
+Yes. With the **SIMCom A7672S**, your ESP32/MCU can automatically:
+
+1. Detect whether the SIM is ready.
+2. Register on the strongest permitted operator.
+3. Read the registered operator’s MCC/MNC.
+4. Select the correct APN.
+5. activate the 4G data connection.
+6. track how much data the device uploads/downloads.
+
+The A7672S is an LTE Cat-1 module supporting embedded TCP/IP, HTTP/HTTPS and MQTT functions, controlled through AT commands. ([SIMCom][1])
+
+## 1. Keep operator selection automatic
+
+Do **not** manually force `405868`, `40470`, etc. during normal operation.
+
+Send:
+
+```text
+AT+COPS=0
+```
+
+This tells the modem:
+
+> Automatically select and register with the SIM’s permitted network.
+
+Then wait for LTE registration.
+
+```text
+AT+CEREG?
+```
+
+Typical successful responses:
+
+```text
++CEREG: 0,1
+```
+
+or:
+
+```text
++CEREG: 0,5
+```
+
+Meaning:
+
+| Status | Meaning                    |
+| -----: | -------------------------- |
+|    `1` | Registered on home network |
+|    `5` | Registered while roaming   |
+|    `2` | Searching                  |
+|    `3` | Registration denied        |
+|    `0` | Not registered             |
+
+For a product-grade system, accept both `1` and `5` as registered.
+
+---
+
+## 2. Read the detected operator and MCC/MNC
+
+First request numeric operator format:
+
+```text
+AT+COPS=3,2
+```
+
+Then:
+
+```text
+AT+COPS?
+```
+
+Example for Jio Rajasthan:
+
+```text
++COPS: 0,2,"405868",7
+```
+
+Parse it as:
+
+```text
+Mode:       0
+Format:     2
+PLMN:       405868
+Technology: 7
+```
+
+Here:
+
+```text
+MCC = 405
+MNC = 868
+Operator = Jio
+Circle = Rajasthan
+```
+
+Example Airtel Rajasthan:
+
+```text
++COPS: 0,2,"40470",7
+```
+
+```text
+MCC = 404
+MNC = 70
+Operator = Airtel
+Circle = Rajasthan
+```
+
+### Rajasthan lookup table
+
+```cpp
+struct OperatorRecord {
+    const char* plmn;
+    const char* operatorName;
+    const char* circle;
+    const char* apn;
+};
+
+const OperatorRecord operators[] = {
+    {"405868", "Reliance Jio", "Rajasthan", "jionet"},
+    {"40470",  "Airtel",       "Rajasthan", "airtelgprs.com"},
+    {"40459",  "BSNL",         "Rajasthan", "bsnlnet"},
+    {"40460",  "Vi",           "Rajasthan", "www"},
+    {"40487",  "Vi",           "Rajasthan", "www"}
+};
+```
+
+Jio officially specifies `JioNet` as its data APN, while Vi specifies `www`. ([Jio][2])
+
+APNs are normally case-insensitive, but use lowercase consistently:
+
+```text
+jionet
+airtelgprs.com
+www
+bsnlnet
+```
+
+---
+
+## 3. Recommended startup sequence
+
+Use this sequence after powering the A7672S.
+
+### Basic communication
+
+```text
+AT
+ATE0
+AT+CMEE=2
+```
+
+Purpose:
+
+* `AT`: module check
+* `ATE0`: disable command echo
+* `AT+CMEE=2`: enable descriptive errors
+
+### SIM check
+
+```text
+AT+CPIN?
+```
+
+Expected:
+
+```text
++CPIN: READY
+```
+
+If SIM PIN protection is enabled:
+
+```text
++CPIN: SIM PIN
+```
+
+Then either enter the PIN securely or ask the installer to disable SIM PIN locking.
+
+### Signal check
+
+```text
+AT+CSQ
+```
+
+Example:
+
+```text
++CSQ: 20,99
+```
+
+Approximate interpretation:
+
+|     CSQ | Condition |
+| ------: | --------- |
+|   `0–5` | Very poor |
+|   `6–9` | Poor      |
+| `10–14` | Usable    |
+| `15–19` | Good      |
+| `20–31` | Very good |
+|    `99` | Unknown   |
+
+For LTE, also read detailed radio information:
+
+```text
+AT+CPSI?
+```
+
+This can provide LTE band, cell identity and signal-quality details, depending on firmware.
+
+### Automatic registration
+
+```text
+AT+COPS=0
+```
+
+Poll:
+
+```text
+AT+CEREG?
+```
+
+Wait until:
+
+```text
++CEREG: 0,1
+```
+
+or:
+
+```text
++CEREG: 0,5
+```
+
+Do not repeatedly send `AT+COPS=0` every few seconds. Send it once, then allow the modem time to search.
+
+### Detect operator
+
+```text
+AT+COPS=3,2
+AT+COPS?
+```
+
+Extract the PLMN string.
+
+---
+
+## 4. Configure APN automatically
+
+Once the operator is detected:
+
+### Jio
+
+```text
+AT+CGDCONT=1,"IP","jionet"
+```
+
+### Airtel
+
+```text
+AT+CGDCONT=1,"IP","airtelgprs.com"
+```
+
+### Vi
+
+```text
+AT+CGDCONT=1,"IP","www"
+```
+
+### BSNL
+
+```text
+AT+CGDCONT=1,"IP","bsnlnet"
+```
+
+Then verify:
+
+```text
+AT+CGDCONT?
+```
+
+Example:
+
+```text
++CGDCONT: 1,"IP","jionet","0.0.0.0",0,0
+```
+
+These APNs normally do not require username and password.
+
+---
+
+## 5. Activate the data connection
+
+For A76XX embedded TCP/IP operation, a commonly used flow is:
+
+```text
+AT+CGATT=1
+AT+CGACT=1,1
+AT+NETOPEN
+```
+
+Check:
+
+```text
+AT+NETOPEN?
+```
+
+Expected:
+
+```text
++NETOPEN: 1
+```
+
+Read the assigned IP address:
+
+```text
+AT+IPADDR
+```
+
+Depending on firmware revision, your application may use `AT+NETOPEN` or the PDP/application commands associated with MQTT, HTTP or TCP. SIMCom publishes separate A76XX application notes for TCP/IP, HTTP/HTTPS and MQTT. ([SIMCom][3])
+
+A typical complete sequence is:
+
+```text
+AT
+ATE0
+AT+CMEE=2
+AT+CPIN?
+AT+COPS=0
+AT+CEREG?
+AT+COPS=3,2
+AT+COPS?
+AT+CGDCONT=1,"IP","jionet"
+AT+CGATT=1
+AT+CGACT=1,1
+AT+NETOPEN
+AT+IPADDR
+```
+
+Do not send all commands without checking responses. Every stage should wait for `OK`, registration, or the relevant unsolicited response.
+
+---
+
+## 6. Better APN-selection algorithm
+
+Do not rely only on the Rajasthan PLMN table. Your device may be installed anywhere in India.
+
+Use three levels:
+
+### Level 1 — Known PLMN
+
+```text
+405868 ? jionet
+40470  ? airtelgprs.com
+40459  ? bsnlnet
+40460  ? www
+40487  ? www
+```
+
+Expand this database with all circles.
+
+### Level 2 — Operator-name matching
+
+Set alphanumeric format:
+
+```text
+AT+COPS=3,0
+AT+COPS?
+```
+
+Possible response:
+
+```text
++COPS: 0,0,"JIO 4G",7
+```
+
+Match broadly:
+
+```cpp
+if (name contains "JIO") {
+    apn = "jionet";
+} else if (name contains "AIRTEL") {
+    apn = "airtelgprs.com";
+} else if (name contains "VODAFONE" ||
+           name contains "IDEA" ||
+           name contains "VI") {
+    apn = "www";
+} else if (name contains "BSNL" ||
+           name contains "CELLONE") {
+    apn = "bsnlnet";
+}
+```
+
+### Level 3 — APN trial fallback
+
+When operator identification is unknown, test APNs sequentially:
+
+```text
+jionet
+airtelgprs.com
+www
+bsnlnet
+```
+
+For each APN:
+
+1. Set `CGDCONT`.
+2. activate PDP.
+3. open network.
+4. perform DNS lookup or HTTPS health check.
+5. keep the first working APN.
+6. save it in NVS.
+
+Do not continuously retry every APN. Cache the successful combination:
+
+```text
+ICCID hash
+PLMN
+APN
+Last success time
+```
+
+---
+
+## 7. Important issue: operator detected versus SIM operator
+
+`AT+COPS?` reports the **currently serving network**.
+
+That can differ in cases involving:
+
+* national roaming,
+* network-sharing,
+* international roaming,
+* temporary operator arrangements.
+
+Therefore, a robust device should use:
+
+```text
+Serving PLMN + saved successful APN + APN fallback
+```
+
+It should not depend only on the phone-number prefix. After mobile-number portability, the number prefix does not reliably identify the current operator.
+
+You can also read:
+
+```text
+AT+CIMI
+```
+
+This returns the IMSI. The first digits generally identify the SIM’s home MCC/MNC, but IMSI information should be treated as sensitive and should not be published in logs.
+
+Read ICCID using:
+
+```text
+AT+CCID
+```
+
+Store only a hash or masked form:
+
+```text
+8991********1234
+```
+
+---
+
+# Data-usage measurement
+
+There are two different meanings of “data use”:
+
+1. Enable the SIM’s mobile-data connection.
+2. measure how many MB the IoT device consumes.
+
+The commands above enable data. For accurate consumption tracking, implement counters in your firmware and server.
+
+## Firmware counters
+
+Track:
+
+```cpp
+uint64_t mqttPayloadTxBytes;
+uint64_t mqttPayloadRxBytes;
+
+uint64_t socketTxBytes;
+uint64_t socketRxBytes;
+
+uint64_t otaDownloadBytes;
+uint64_t httpTxBytes;
+uint64_t httpRxBytes;
+```
+
+Whenever data is sent:
+
+```cpp
+socketTxBytes += payloadLength;
+```
+
+Whenever received:
+
+```cpp
+socketRxBytes += receivedLength;
+```
+
+Then calculate:
+
+```cpp
+uint64_t totalBytes = socketTxBytes + socketRxBytes;
+double totalMB = totalBytes / 1048576.0;
+```
+
+Save periodically to NVS, for example:
+
+* every additional 100 KB,
+* every 30 minutes,
+* before controlled shutdown.
+
+Do not write NVS after every packet because it will cause unnecessary flash wear.
+
+## Account for protocol overhead
+
+Application payload counting is lower than the operator’s billed usage because mobile data also includes:
+
+* TCP/IP headers,
+* TLS handshake and encryption overhead,
+* MQTT headers,
+* DNS requests,
+* keep-alive packets,
+* retransmissions,
+* network control traffic,
+* OTA metadata.
+
+For estimation, you might apply:
+
+```text
+Estimated billed usage =
+application bytes × 1.10 to 1.30
+```
+
+But this remains an estimate. The operator’s billing record is authoritative.
+
+## Best professional method
+
+Maintain both:
+
+```text
+AppPayloadBytes
+EstimatedNetworkBytes
+```
+
+Example telemetry:
+
+```json
+{
+  "operator": "Reliance Jio",
+  "plmn": "405868",
+  "apn": "jionet",
+  "registration": "home",
+  "rat": "LTE",
+  "csq": 20,
+  "sessionTxBytes": 185420,
+  "sessionRxBytes": 58210,
+  "monthTxBytes": 9247120,
+  "monthRxBytes": 3189050,
+  "estimatedMonthlyMB": 15.2
+}
+```
+
+## Recommended firmware state machine
+
+```text
+MODEM_POWER_ON
+      ?
+WAIT_FOR_AT
+      ?
+CHECK_SIM
+      ?
+AUTOMATIC_OPERATOR_SELECTION
+      ?
+WAIT_FOR_LTE_REGISTRATION
+      ?
+READ_PLMN_AND_OPERATOR
+      ?
+SELECT_APN
+      ?
+ACTIVATE_PDP
+      ?
+TEST_INTERNET
+      ?
+START_MQTT/HTTP
+      ?
+TRACK_TX/RX
+      ?
+RECOVER_IF_CONNECTION_FAILS
+```
+
+Recovery should proceed gradually:
+
+```text
+1. Reopen MQTT/socket
+2. Reopen network service
+3. Reactivate PDP
+4. Recheck registration
+5. Re-run automatic operator selection
+6. Restart modem as final step
+```
+
+Avoid restarting the entire modem on every MQTT failure.
+
+The safest design is therefore: **`AT+COPS=0` for automatic network selection, `AT+COPS?` for operator detection, dynamic APN configuration, internet validation, and firmware/server-based byte counters for data usage.**
+
+[1]: https://www.simcom.com/product/A7672X.html?utm_source=chatgpt.com "A7672X - SIMCom Wireless Solutions"
+[2]: https://www.jio.com/help/faq/mobile/services/high-speed-internet/how-do-i-set-the-apn-on-my-smartphone-to-jionet/?utm_source=chatgpt.com "How do I set the APN on my smartphone to 'JioNet'?"
+[3]: https://www.simcom.com/product/A7670X.html?utm_source=chatgpt.com "A7670"
