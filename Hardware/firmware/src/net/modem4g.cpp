@@ -145,21 +145,26 @@ static bool apply_default_bearer_apn(const char* apn) {
     return false;
 }
 
+// Bounded AT waits so a single modem step can never freeze the main loop for
+// long (WiFi/MQTT must keep running). Commands still take effect; we just don't
+// block for the full worst-case timeout.
 static void reset_data_plane() {
     esp_task_wdt_reset();
     s_modem.sendAT(GF("+NETCLOSE"));
-    s_modem.waitResponse(10000L);
+    s_modem.waitResponse(3000L);
     s_modem.sendAT(GF("+CGACT=0,1"));
-    s_modem.waitResponse(10000L);
+    s_modem.waitResponse(3000L);
     s_modem.sendAT(GF("+CGATT=0"));
-    s_modem.waitResponse(10000L);
+    s_modem.waitResponse(3000L);
     esp_task_wdt_reset();
 }
 
 static void auto_select_operator() {
     esp_task_wdt_reset();
+    // COPS=0 returns OK quickly and the network scan continues in the background
+    // (we poll CEREG separately), so a short wait is enough — don't block 30s.
     s_modem.sendAT(GF("+COPS=0"));
-    s_modem.waitResponse(30000L);
+    s_modem.waitResponse(3000L);
     esp_task_wdt_reset();
 }
 

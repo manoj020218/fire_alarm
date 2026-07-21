@@ -112,11 +112,20 @@ void uplink_init() {
 }
 
 void uplink_loop() {
-    // Drive the 4G state machine on a ~1.5s cadence (not every 30s, not every
-    // loop). Fast enough that bring-up steps run at their real durations; slow
-    // enough that we don't flood the modem's AT port during registration. Runs
-    // even when WiFi/LAN is active → 4G stays warm for instant failover + SMS.
-    if (task_due(s_modemTask)) {
+    // Decide whether to drive the modem at all. Modem AT calls can block for a
+    // few seconds, so we DON'T run it when the user picked WiFi, or when a WiFi/
+    // LAN path is already up in WiFi-first mode — that keeps the loop (and the
+    // live WiFi uplink) responsive instead of stalling on 4G bring-up.
+    //   0 Auto (SIM-first) / 2 SIM-only → always drive modem
+    //   1 WiFi/LAN first  → drive modem only when WiFi AND LAN are down
+    //   3 WiFi only        → never drive the modem
+    bool needModem;
+    switch (getConfig().uplinkPref) {
+        case 3:  needModem = false; break;
+        case 1:  needModem = !(wifi_sta_connected() || eth_is_connected()); break;
+        default: needModem = true; break;
+    }
+    if (needModem && task_due(s_modemTask)) {
         modem4g_step(getConfig().apn);
     }
 
