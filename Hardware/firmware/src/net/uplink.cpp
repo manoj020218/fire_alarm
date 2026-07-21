@@ -28,6 +28,15 @@ static Task       s_checkTask  = {0, UPLINK_CHECK_INTERVAL_MS};
 static Task       s_modemTask  = {0, 1500};  // drive modem ~every 1.5s (not every
                                              // loop — hammering AT stalls registration)
 static bool       s_wifiInited = false;
+// Per-transport "cloud unreachable" cooldown (indexed by UplinkType). While a
+// transport is avoided we don't prefer it, so the gateway fails over to one that
+// actually reaches the broker instead of stranding online-but-offline.
+static uint32_t   s_avoidUntil[4] = {0, 0, 0, 0};
+
+static bool avoided(UplinkType t) {
+    uint32_t until = s_avoidUntil[(int)t];
+    return until != 0 && (int32_t)(millis() - until) < 0;
+}
 
 // Build the WiFi AP SSID from the gateway ID
 static String ap_ssid() {
@@ -39,26 +48,49 @@ static String ap_ssid() {
 }
 
 // ---- non-blocking probe — returns best available transport ---
-// The modem state machine is driven every loop() in uplink_loop() (fast cadence
-// + kept warm), so here we only CHECK its status. Priority: 4G > WiFi > LAN
-// (SIM-first; will become configurable via uplinkOrder).
+// Honors the configured uplink preference (cfg.uplinkPref):
+//   0 = Auto (SIM-first): 4G > WiFi > LAN, with cloud failover
+//   1 = WiFi/LAN first:   WiFi > LAN > 4G
+//   2 = SIM only:         4G only
+//   3 = WiFi only:        WiFi only
+// A transport that MQTT reported cloud-unreachable is skipped (unless it's the
+// only thing up). The modem SM is driven in uplink_loop(); here we only check.
 static UplinkType probe_transports() {
-    if (modem4g_is_connected()) {
-        return UplinkType::G4;
-    }
+    eth_step();  // keep LAN DHCP advancing
+    const bool up4g  = modem4g_is_connected();
+    const bool upWifi = wifi_sta_connected();
+    const bool upLan  = eth_is_connected();
 
-    // WiFi STA: just poll (WiFi.begin was called in uplink_init)
-    if (wifi_sta_connected()) {
-        return UplinkType::WIFI;
+    UplinkType order[3];
+    int n = 0;
+    switch (getConfig().uplinkPref) {
+        case 3: order[n++] = UplinkType::WIFI; break;                                  // WiFi only
+        case 2: order[n++] = UplinkType::G4;   break;                                  // SIM only
+        case 1: order[n++] = UplinkType::WIFI; order[n++] = UplinkType::LAN;
+                order[n++] = UplinkType::G4;   break;                                  // WiFi/LAN first
+        default: order[n++] = UplinkType::G4;  order[n++] = UplinkType::WIFI;
+                 order[n++] = UplinkType::LAN; break;                                  // Auto SIM-first
     }
-
-    // LAN: advance state machine one step
-    eth_step();
-    if (eth_is_connected()) {
-        return UplinkType::LAN;
-    }
-
+    auto isUp = [&](UplinkType t) {
+        return (t == UplinkType::G4 && up4g) || (t == UplinkType::WIFI && upWifi) ||
+               (t == UplinkType::LAN && upLan);
+    };
+    // Pass 1: first up transport that isn't cloud-avoided.
+    for (int i = 0; i < n; i++) if (isUp(order[i]) && !avoided(order[i])) return order[i];
+    // Pass 2: ignore the avoid list rather than strand with nothing.
+    for (int i = 0; i < n; i++) if (isUp(order[i])) return order[i];
     return UplinkType::NONE;
+}
+
+void uplink_report_cloud_fail() {
+    if (s_active == UplinkType::NONE) return;
+    s_avoidUntil[(int)s_active] = millis() + UPLINK_CLOUD_AVOID_MS;
+    LOG_W("UPLINK", "Cloud unreachable over %s — failing over", uplink_type_str());
+    task_trigger_now(s_checkTask);   // re-select immediately
+}
+
+void uplink_report_cloud_ok() {
+    if (s_active != UplinkType::NONE) s_avoidUntil[(int)s_active] = 0;
 }
 
 void uplink_init() {

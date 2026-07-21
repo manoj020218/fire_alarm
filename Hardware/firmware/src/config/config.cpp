@@ -40,6 +40,7 @@ static void load_defaults() {
     strlcpy(s_cfg.smsNumbers, SMS_NUMBERS_DEFAULT, sizeof(s_cfg.smsNumbers));
     s_cfg.smsEnabled             = SMS_ENABLED_DEFAULT;
     s_cfg.lteOnly                = LTE_ONLY_DEFAULT;
+    s_cfg.uplinkPref             = UPLINK_PREF_DEFAULT;
     s_cfg.regCount               = 0;
     s_cfg.thresholdCount         = 0;
 
@@ -100,6 +101,7 @@ void config_load() {
     STR_GET("smsNums",   s_cfg.smsNumbers, SMS_NUMBERS_DEFAULT);
     s_cfg.smsEnabled = s_prefs.getBool("smsEn", SMS_ENABLED_DEFAULT);
     s_cfg.lteOnly    = s_prefs.getBool("lteOnly", LTE_ONLY_DEFAULT);
+    s_cfg.uplinkPref = s_prefs.getUChar("uplinkPref", UPLINK_PREF_DEFAULT);
 
     s_prefs.end();
 
@@ -132,6 +134,7 @@ void config_save() {
     s_prefs.putString("smsNums",   s_cfg.smsNumbers);
     s_prefs.putBool  ("smsEn",     s_cfg.smsEnabled);
     s_prefs.putBool  ("lteOnly",   s_cfg.lteOnly);
+    s_prefs.putUChar ("uplinkPref", s_cfg.uplinkPref);
     s_prefs.end();
     LOG_I("CFG", "Saved to NVS");
 }

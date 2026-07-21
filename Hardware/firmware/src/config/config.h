@@ -80,6 +80,10 @@ struct GatewayConfig {
     // won't attach in auto mode). Leave OFF (auto: 2G/3G/4G) for Airtel/VI/BSNL.
     bool lteOnly;         // default false
 
+    // Uplink preference: 0=Auto (SIM-first, cloud-failover), 1=WiFi/LAN first,
+    // 2=SIM(4G) only, 3=WiFi only. Applied by uplink probe.
+    uint8_t uplinkPref;   // default 0 (Auto)
+
     // Hardening
     uint8_t  autoRebootHour;   // hour (0-23) for daily auto-reboot; 255 = disabled
     bool     otaAuto;          // auto-apply OTA when manifest has update

@@ -125,6 +125,12 @@ function buildConfigForm(d){
   '<div class="row"><div><label>Gateway ID</label><input id="cGw" value="'+h(d.gatewayId||'')+'"></div>'+
   '<div><label>APN (blank=auto)</label><input id="cApn" value="'+h(d.apn||'')+'"></div></div>'+
   '<div class="row"><div style="display:flex;flex-direction:column;gap:.35rem"><label>LTE-only mode — turn ON for JIO SIM (auto for Airtel/VI/BSNL)<input id="cLteOnly" type="checkbox"'+(d.lteOnly?' checked':'')+' style="width:auto;margin-left:.4rem"></label></div><div></div></div>'+
+  '<div><label>Online via (uplink preference)</label><select id="cUpPref">'+
+  '<option value="0"'+(d.uplinkPref==0?' selected':'')+'>Auto — SIM (4G) first, WiFi fallback</option>'+
+  '<option value="1"'+(d.uplinkPref==1?' selected':'')+'>WiFi / LAN first</option>'+
+  '<option value="2"'+(d.uplinkPref==2?' selected':'')+'>SIM (4G) only</option>'+
+  '<option value="3"'+(d.uplinkPref==3?' selected':'')+'>WiFi only</option>'+
+  '</select></div>'+
   '<div class="row"><div><label>MQTT Host</label><input id="cMqttH" value="'+h(d.mqttHost||'')+'"></div>'+
   '<div><label>MQTT Port</label><input id="cMqttP" value="'+h(d.mqttPort||1883)+'" type="number"></div></div>'+
   '<div class="row"><div><label>MQTT User</label><input id="cMqttU" value="'+h(d.mqttUser||'')+'"></div>'+
@@ -146,7 +152,7 @@ function buildConfigForm(d){
 }
 function saveConfig(){
   if(!checkAuth())return;
-  var body={env:document.getElementById('cEnv').value,siteId:document.getElementById('cSite').value,gatewayId:document.getElementById('cGw').value,apn:document.getElementById('cApn').value,mqttHost:document.getElementById('cMqttH').value,mqttPort:parseInt(document.getElementById('cMqttP').value),mqttUser:document.getElementById('cMqttU').value,apiHost:document.getElementById('cApiH').value,wifiSsid:document.getElementById('cWifiS').value,smsNumbers:document.getElementById('cSmsNums').value,smsEnabled:document.getElementById('cSmsEn').checked,lteOnly:document.getElementById('cLteOnly').checked};
+  var body={env:document.getElementById('cEnv').value,siteId:document.getElementById('cSite').value,gatewayId:document.getElementById('cGw').value,apn:document.getElementById('cApn').value,mqttHost:document.getElementById('cMqttH').value,mqttPort:parseInt(document.getElementById('cMqttP').value),mqttUser:document.getElementById('cMqttU').value,apiHost:document.getElementById('cApiH').value,wifiSsid:document.getElementById('cWifiS').value,smsNumbers:document.getElementById('cSmsNums').value,smsEnabled:document.getElementById('cSmsEn').checked,lteOnly:document.getElementById('cLteOnly').checked,uplinkPref:parseInt(document.getElementById('cUpPref').value)};
   var p=document.getElementById('cMqttPw').value;if(p)body.mqttPass=p;
   var wp=document.getElementById('cWifiP').value;if(wp)body.wifiPass=wp;
   var ap=document.getElementById('cAdminPw').value;if(ap)body.adminPass=ap;

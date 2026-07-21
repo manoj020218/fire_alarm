@@ -17,5 +17,9 @@ UplinkType uplink_active_type();
 const char* uplink_type_str();  // "4g" | "lan" | "wifi" | "none"
 Client&  uplink_get_client();       // MQTT (persistent)
 Client&  uplink_get_http_client();  // HTTP/api — separate socket, never shared with MQTT
+// Cloud reachability feedback from MQTT: if the cloud can't be reached over the
+// active transport, avoid it for a while and fail over (unless pref forbids).
+void     uplink_report_cloud_fail();
+void     uplink_report_cloud_ok();
 int      uplink_signal_4g_dbm();
 bool     uplink_signal_lan();

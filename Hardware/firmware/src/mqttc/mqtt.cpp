@@ -24,6 +24,7 @@ static PubSubClient  s_mqtt;
 static MqttMessageCb s_userCb = nullptr;
 static Task          s_reconnectTask = {0, 5000};  // retry every 5 s
 static UplinkType    s_lastUplink = UplinkType::NONE;  // transport we're bound to
+static uint8_t       s_connectFails = 0;               // consecutive failed connects
 
 // ---- Inbound command dispatch --------------------------------
 
@@ -161,11 +162,19 @@ static bool do_connect() {
     if (ok) {
         health_inc_mqtt_reconnect();
         s_lastUplink = uplink_active_type();   // remember the transport we bound to
+        s_connectFails = 0;
+        uplink_report_cloud_ok();
         LOG_I("MQTT", "Connected to %s:%d as %s over %s",
               cfg.mqttHost, cfg.mqttPort, cfg.gatewayId, uplink_type_str());
         subscribe_all();
     } else {
         LOG_W("MQTT", "Connect failed rc=%d", s_mqtt.state());
+        // Can't reach the broker over the active transport — after a few tries,
+        // tell the uplink manager to fail over to another transport.
+        if (++s_connectFails >= 4) {
+            s_connectFails = 0;
+            uplink_report_cloud_fail();
+        }
     }
     return ok;
 }

@@ -80,6 +80,7 @@ static void handle_get_config(AsyncWebServerRequest* req) {
     doc["smsNumbers"] = cfg.smsNumbers;
     doc["smsEnabled"] = cfg.smsEnabled;
     doc["lteOnly"]    = cfg.lteOnly;
+    doc["uplinkPref"] = cfg.uplinkPref;
 
     // WiFi STA SSID (stored separately)
     Preferences wprefs;
@@ -156,6 +157,8 @@ static void handle_post_config(AsyncWebServerRequest* req, uint8_t* data,
         cfg.smsEnabled = doc["smsEnabled"].as<bool>();
     if (doc.containsKey("lteOnly"))
         cfg.lteOnly = doc["lteOnly"].as<bool>();
+    if (doc.containsKey("uplinkPref"))
+        cfg.uplinkPref = doc["uplinkPref"].as<uint8_t>();
 
     config_save();
 

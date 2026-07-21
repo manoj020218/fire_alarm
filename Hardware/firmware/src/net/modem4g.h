@@ -1,59 +1,42 @@
 #pragma once
 // ============================================================
-// FireGuard — 4G modem (SIMCOM A7672S via TinyGSM as SIM7600)
-// Non-blocking state machine: call modem4g_step() each loop tick
-// to advance the bring-up sequence without stalling loopTask.
+// FireGuard 4G modem (SIMCOM A7672S via TinyGSM A7672X)
+// Non-blocking state machine: call modem4g_step() each uplink tick.
 // ============================================================
 #include <Arduino.h>
 
-// Modem bring-up states (informational; drives modem4g_step logic)
 enum class Modem4gState : uint8_t {
     OFF = 0,
-    POWERING,       // PWR_KEY pulse in progress
-    WAIT_AT,        // waiting for AT response after power-up
-    WAIT_NETWORK,   // polling isNetworkConnected()
-    CONNECTING_GPRS,// gprsConnect() attempt (one-shot, bracketed with WDT reset)
+    POWERING,
+    POWERING_DOWN,
+    WAIT_AT,
+    WAIT_NETWORK,
+    CONNECTING_GPRS,
     CONNECTED,
-    FAILED          // back-off before retry
+    FAILED
 };
 
-// Non-blocking step: call every uplink tick; returns current state.
-// Internally advances state machine; never blocks > ~2 s per call.
 Modem4gState modem4g_step(const char* apn);
-
-// True when CONNECTED and PDP context is active.
 bool modem4g_is_connected();
-
-// Periodic maintenance (dropped-context detection); non-blocking.
 void modem4g_maintain();
 
-int    modem4g_signal_dbm();
+int modem4g_signal_dbm();
 String modem4g_operator();
-const char* modem4g_state_str();   // current state name (for telemetry/debug)
-bool   modem4g_get_time(struct tm* out);
+const char* modem4g_state_str();
+bool modem4g_get_time(struct tm* out);
 
-// SMS alerting (Change 3).
-// Returns true if the modem is network-registered (not necessarily GPRS).
-// SMS works over circuit-switched network even when data uplink is WiFi/LAN.
-bool   modem4g_is_registered();
+bool modem4g_is_registered();
+bool modem4g_send_sms(const char* number, const char* text);
 
-// Send a single SMS.  Best-effort: returns false if modem not registered or send fails.
-// Brackets the blocking sendSMS() call with esp_task_wdt_reset().
-bool   modem4g_send_sms(const char* number, const char* text);
-
-// ── SIM / cellular info (on-demand; each brackets blocking AT with wdt resets) ──
-String modem4g_iccid();                       // SIM serial (getSimCCID)
-String modem4g_imsi();                        // AT+CIMI
-int    modem4g_signal_csq();                  // 0-31 (99 = unknown)
-String modem4g_own_number();                  // AT+CNUM (often blank — operator-dependent)
-String modem4g_ussd(const char* code);        // AT+CUSD balance/validity → raw text
-String modem4g_read_sms_raw();                // AT+CMGL="ALL" text-mode dump
-// Send SMS and return "" on success, or the exact error (e.g. "+CMS ERROR: 331").
+String modem4g_iccid();
+String modem4g_imsi();
+int modem4g_signal_csq();
+String modem4g_own_number();
+String modem4g_ussd(const char* code);
+String modem4g_read_sms_raw();
 String modem4g_send_sms_diag(const char* number, const char* text);
-// Place a short voice call (missed-call alert): dial, ring ~12 s, hang up.
-bool   modem4g_call(const char* number);
+bool modem4g_call(const char* number);
 
-// Access the underlying TinyGSM client (owned by uplink module)
 class Client;
 Client* modem4g_get_client();
-Client* modem4g_get_http_client();  // separate mux for HTTP (not shared with MQTT)
+Client* modem4g_get_http_client();

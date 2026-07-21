@@ -67,6 +67,10 @@
 // --- Cellular: LTE-only (JIO) mode --------------------------
 #define LTE_ONLY_DEFAULT        false       // OFF = auto (all operators); ON = LTE-only (JIO)
 
+// --- Uplink preference (0=Auto SIM-first, 1=WiFi/LAN first, 2=SIM only, 3=WiFi only) ---
+#define UPLINK_PREF_DEFAULT     0
+#define UPLINK_CLOUD_AVOID_MS   90000       // avoid a cloud-unreachable transport this long
+
 // --- OTA / backup -------------------------------------------
 // 10-min self-validate window: over a flaky SIM the modem may take minutes to
 // re-attach after reboot; too-short a window would roll back a healthy image.
