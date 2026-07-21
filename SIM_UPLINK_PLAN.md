@@ -63,6 +63,20 @@ Custom…), Custom = drag-to-reorder + on/off toggles.
    dashboard control (pushed via `config/set`), default SIM-first, with hold-down + keep-4G-warm.
 7. Field-validate on **Airtel SIM** (auto RAT) first, then JIO (LTE-only) — over the real unit.
 
+## D-bis. Adopt from `MNC MCC.txt` (A7672S reference — confirmed correct)
+- **CEREG registration check** (accept `1` home / `5` roaming) — ALREADY DONE in 1.1.4 ✓.
+- **Auto-APN by operator (no manual APN per SIM):** after registration, `AT+COPS=3,2` + `AT+COPS?`
+  → parse serving **PLMN**, look up APN (405868→jionet, 40470→airtelgprs.com, 40460/40487→www,
+  40459→bsnlnet); fallback: operator-name match (`COPS=3,0`), then APN trial+cache in NVS keyed by
+  ICCID. → set `CGDCONT` automatically. Removes the "set APN per SIM" step.
+- **CPIN READY gate** before registration (S5).
+- **Don't spam `COPS=0` / don't restart modem per failure** — gradual recovery ladder:
+  reopen socket → reopen net service → reactivate PDP → recheck reg → `COPS=0` → restart modem LAST.
+- **Data-usage tracking** (answers the earlier "show SIM data/usage" ask): firmware Tx/Rx byte
+  counters (MQTT/HTTP/OTA), persist to NVS every ~100 KB / 30 min, telemetry reports
+  session+month bytes + estimated MB (×1.1–1.3 for headers). Operator billing is authoritative.
+- Report `operator`, `plmn`, `apn`, `registration`, `rat`, `csq` in the SIM panel.
+
 ## E. Sequencing vs OTA
 This overhaul rides on OTA. Order: **(1) finish proving OTA** (WebUI 1.0.5→1.0.6, then remote
 MQTT 1.0.6→1.0.7) → **(2)** implement Section D as the next firmware (v1.1.0) → **(3)** push it

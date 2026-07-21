@@ -28,6 +28,8 @@ static Modem4gState  s_state        = Modem4gState::OFF;
 static uint32_t      s_stateTs      = 0;   // millis() when we entered current state
 static uint32_t      s_netDeadline  = 0;   // absolute deadline for network registration
 static bool          s_keyReleased  = false; // tracks PWR_KEY release within POWERING state
+static const char*   s_failReason   = "";  // why we last entered FAILED (debug)
+static uint32_t      s_gprsRetryTs  = 0;   // last gprsConnect attempt (retry pacing)
 
 // How long to wait in each state before declaring failure
 #define POWERING_HOLD_MS     1200   // PWR_KEY LOW duration
@@ -44,6 +46,9 @@ static void enter(Modem4gState ns) {
     s_stateTs      = millis();
     // Reset POWERING sub-flag whenever we leave that state
     if (ns != Modem4gState::POWERING) s_keyReleased = false;
+    if (ns == Modem4gState::CONNECTING_GPRS) s_gprsRetryTs = 0;
+    // Fresh registration budget each time we (re)enter the network-wait.
+    if (ns == Modem4gState::WAIT_NETWORK) s_netDeadline = millis() + WAIT_NETWORK_TOTAL_MS;
 }
 
 static uint32_t elapsed() { return millis() - s_stateTs; }
@@ -117,6 +122,7 @@ Modem4gState modem4g_step(const char* apn) {
             enter(Modem4gState::WAIT_NETWORK);
         } else if (elapsed() > WAIT_AT_TIMEOUT_MS) {
             LOG_W("4G", "No AT response — scheduling retry");
+            s_failReason = "no_at";
             enter(Modem4gState::FAILED);
         }
         break;
@@ -138,19 +144,38 @@ Modem4gState modem4g_step(const char* apn) {
 
     // --------------------------------------------------------
     case Modem4gState::CONNECTING_GPRS:
-        // gprsConnect() is a blocking library call (~5-15 s typical).
-        // We bracket it with WDT resets so the watchdog is satisfied.
-        LOG_I("4G", "GPRS connect APN='%s'", apn);
+        // Data/PDP attach. JIO's default LTE bearer often auto-activates a beat
+        // AFTER registration, so: (1) accept an already-active bearer, and
+        // (2) retry gprsConnect every ~5s for up to 60s instead of failing on the
+        // first (too-early) attempt. gprsConnect() blocks ~5-15s; WDT is fed.
         esp_task_wdt_reset();
-        if (s_modem.gprsConnect(apn, "", "")) {
-            esp_task_wdt_reset();
-            LOG_I("4G", "Connected. Signal: %d dBm  Op: %s",
+        if (s_modem.isGprsConnected()) {
+            LOG_I("4G", "Data already active — Signal %d dBm Op %s",
                   modem4g_signal_dbm(), modem4g_operator().c_str());
             enter(Modem4gState::CONNECTED);
-        } else {
+            break;
+        }
+        if (s_gprsRetryTs == 0 || (millis() - s_gprsRetryTs) > 5000) {
+            s_gprsRetryTs = millis();
+            LOG_I("4G", "Data attach APN='%s'", apn);
             esp_task_wdt_reset();
-            LOG_W("4G", "GPRS connect failed");
-            enter(Modem4gState::FAILED);
+            bool ok = s_modem.gprsConnect(apn, "", "");
+            esp_task_wdt_reset();
+            if (ok || s_modem.isGprsConnected()) {
+                LOG_I("4G", "Data connected. Signal %d dBm Op %s",
+                      modem4g_signal_dbm(), modem4g_operator().c_str());
+                enter(Modem4gState::CONNECTED);
+                break;
+            }
+            LOG_W("4G", "Data attach attempt failed — will retry");
+        }
+        if (elapsed() > 60000) {
+            // Do NOT power-cycle (that toggles the A7672 PWR_KEY OFF and drops
+            // registration). Keep the modem on and re-check registration, then
+            // retry the attach. The modem stays warm/registered throughout.
+            LOG_W("4G", "Data attach still pending — re-checking registration (no power-cycle)");
+            s_failReason = "gprs";
+            enter(Modem4gState::WAIT_NETWORK);
         }
         break;
 
@@ -177,6 +202,7 @@ bool modem4g_is_connected() {
 }
 
 const char* modem4g_state_str() {
+    static char buf[24];
     switch (s_state) {
         case Modem4gState::OFF:             return "off";
         case Modem4gState::POWERING:        return "powering";
@@ -184,7 +210,9 @@ const char* modem4g_state_str() {
         case Modem4gState::WAIT_NETWORK:    return "wait_net";
         case Modem4gState::CONNECTING_GPRS: return "connecting";
         case Modem4gState::CONNECTED:       return "connected";
-        case Modem4gState::FAILED:          return "failed";
+        case Modem4gState::FAILED:
+            snprintf(buf, sizeof(buf), "failed:%s", s_failReason[0] ? s_failReason : "?");
+            return buf;
     }
     return "?";
 }
