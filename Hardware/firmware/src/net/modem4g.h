@@ -23,6 +23,7 @@ void modem4g_maintain();
 int modem4g_signal_dbm();
 String modem4g_operator();
 const char* modem4g_state_str();
+String modem4g_ip();   // modem's data-plane IP (empty if not connected)
 bool modem4g_get_time(struct tm* out);
 
 bool modem4g_is_registered();

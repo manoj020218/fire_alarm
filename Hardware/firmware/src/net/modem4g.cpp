@@ -159,6 +159,24 @@ static void reset_data_plane() {
     esp_task_wdt_reset();
 }
 
+// Open the modem's embedded TCP/IP service (NETOPEN) so TinyGsmClient sockets
+// (CIPOPEN) actually work. The "isGprsConnected() shortcut" only confirms the PDP
+// context (CGATT) is up — without NETOPEN every socket connect fails, which is why
+// MQTT+HTTP both failed over 4G on JIO AND Airtel. Best-effort: issue it and move
+// on (if already open, the modem returns a harmless error).
+static void ensure_data_service() {
+    esp_task_wdt_reset();
+    String r;
+    s_modem.sendAT(GF("+NETOPEN?"));
+    s_modem.waitResponse(3000, r);
+    if (r.indexOf("+NETOPEN: 1") < 0) {      // not already open → open it
+        s_modem.sendAT(GF("+NETOPEN"));
+        s_modem.waitResponse(12000L);        // wait for OK/URC; tolerate any result
+        LOG_I("4G", "NETOPEN issued (TCP/IP service)");
+    }
+    esp_task_wdt_reset();
+}
+
 static void auto_select_operator() {
     esp_task_wdt_reset();
     // COPS=0 returns OK quickly and the network scan continues in the background
@@ -338,7 +356,9 @@ Modem4gState modem4g_step(const char* apn) {
         case Modem4gState::CONNECTING_GPRS:
             esp_task_wdt_reset();
             if (s_modem.isGprsConnected()) {
-                LOG_I("4G", "Data already active - Signal %d dBm Op %s",
+                ensure_data_service();   // open NETOPEN before declaring connected
+                LOG_I("4G", "Data active - IP %s Signal %d dBm Op %s",
+                      s_modem.localIP().toString().c_str(),
                       modem4g_signal_dbm(), modem4g_operator().c_str());
                 enter(Modem4gState::CONNECTED);
                 break;
@@ -355,7 +375,9 @@ Modem4gState modem4g_step(const char* apn) {
                 bool ok = s_modem.gprsConnect(selectedApn, "", "");
                 esp_task_wdt_reset();
                 if (ok || s_modem.isGprsConnected()) {
-                    LOG_I("4G", "Data connected. Signal %d dBm Op %s",
+                    ensure_data_service();   // open NETOPEN before declaring connected
+                    LOG_I("4G", "Data connected. IP %s Signal %d dBm Op %s",
+                          s_modem.localIP().toString().c_str(),
                           modem4g_signal_dbm(), modem4g_operator().c_str());
                     enter(Modem4gState::CONNECTED);
                     break;
@@ -420,6 +442,12 @@ String modem4g_operator() {
     if (!modem_at_ready()) return "N/A";
     String op = s_modem.getOperator();
     return op.length() ? op : "N/A";
+}
+
+String modem4g_ip() {
+    if (s_state != Modem4gState::CONNECTED) return "";
+    IPAddress ip = s_modem.localIP();
+    return ip.toString();
 }
 
 bool modem4g_get_time(struct tm* out) {

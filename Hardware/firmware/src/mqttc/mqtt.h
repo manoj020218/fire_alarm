@@ -9,6 +9,7 @@
 void mqtt_init();
 void mqtt_loop();                       // call every loop(); reconnect + keepalive
 bool mqtt_connected();
+int  mqtt_last_fail_rc();   // last PubSubClient state() on a failed connect (debug)
 bool mqtt_publish(const char* topic, const char* payload, bool retain = false);
 bool mqtt_publish_json(const char* topic, JsonDocument& doc, bool retain = false);
 

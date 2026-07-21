@@ -278,6 +278,8 @@ static void publish_status() {
     doc["signal4g"]  = uplink_signal_4g_dbm();
     doc["signalLan"] = uplink_signal_lan();
     doc["modem"]     = modem4g_state_str();   // 4G bring-up state (debug visibility)
+    doc["ip4g"]      = modem4g_ip();           // modem data-plane IP (confirms NETOPEN)
+    doc["mqttRc"]    = mqtt_last_fail_rc();     // last MQTT connect fail code (-2=socket, 4/5=auth, 2=id)
     doc["uptime"]    = health_uptime_s();
     doc["heap"]      = health_free_heap();
     doc["reset"]     = health_reset_reason();
