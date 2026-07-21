@@ -23,6 +23,7 @@
 static PubSubClient  s_mqtt;
 static MqttMessageCb s_userCb = nullptr;
 static Task          s_reconnectTask = {0, 5000};  // retry every 5 s
+static UplinkType    s_lastUplink = UplinkType::NONE;  // transport we're bound to
 
 // ---- Inbound command dispatch --------------------------------
 
@@ -159,8 +160,9 @@ static bool do_connect() {
 
     if (ok) {
         health_inc_mqtt_reconnect();
-        LOG_I("MQTT", "Connected to %s:%d as %s",
-              cfg.mqttHost, cfg.mqttPort, cfg.gatewayId);
+        s_lastUplink = uplink_active_type();   // remember the transport we bound to
+        LOG_I("MQTT", "Connected to %s:%d as %s over %s",
+              cfg.mqttHost, cfg.mqttPort, cfg.gatewayId, uplink_type_str());
         subscribe_all();
     } else {
         LOG_W("MQTT", "Connect failed rc=%d", s_mqtt.state());
@@ -176,6 +178,15 @@ void mqtt_init() {
 
 void mqtt_loop() {
     if (s_mqtt.connected()) {
+        // If the uplink switched transports (e.g. WiFi -> 4G), the current socket
+        // is on the old transport — drop it so we reconnect over the new one.
+        if (uplink_active_type() != s_lastUplink && uplink_is_up()) {
+            LOG_I("MQTT", "Uplink changed %d->%d — reconnecting over new transport",
+                  (int)s_lastUplink, (int)uplink_active_type());
+            s_mqtt.disconnect();
+            task_trigger_now(s_reconnectTask);
+            return;
+        }
         s_mqtt.loop();
         return;
     }

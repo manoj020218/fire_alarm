@@ -277,6 +277,7 @@ static void publish_status() {
     doc["uplink"]    = uplink_type_str();
     doc["signal4g"]  = uplink_signal_4g_dbm();
     doc["signalLan"] = uplink_signal_lan();
+    doc["modem"]     = modem4g_state_str();   // 4G bring-up state (debug visibility)
     doc["uptime"]    = health_uptime_s();
     doc["heap"]      = health_free_heap();
     doc["reset"]     = health_reset_reason();

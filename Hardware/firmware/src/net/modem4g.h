@@ -29,6 +29,7 @@ void modem4g_maintain();
 
 int    modem4g_signal_dbm();
 String modem4g_operator();
+const char* modem4g_state_str();   // current state name (for telemetry/debug)
 bool   modem4g_get_time(struct tm* out);
 
 // SMS alerting (Change 3).

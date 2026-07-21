@@ -1,5 +1,5 @@
 // ============================================================
-// FireGuard — 4G modem state machine (A7672S / TinyGSM SIM7600)
+// FireGuard — 4G modem state machine (A7672S / TinyGSM A7672X driver)
 // Serial1: RX=27 TX=26  PWR_KEY=4
 //
 // NON-BLOCKING DESIGN
@@ -33,7 +33,8 @@ static bool          s_keyReleased  = false; // tracks PWR_KEY release within PO
 #define POWERING_HOLD_MS     1200   // PWR_KEY LOW duration
 #define POWERING_SETTLE_MS   3000   // post-key settle
 #define WAIT_AT_TIMEOUT_MS   8000   // testAT window
-#define WAIT_NETWORK_TOTAL_MS 60000 // total network registration budget
+#define WAIT_NETWORK_TOTAL_MS 300000 // per-attempt network registration budget
+                                     // (JIO LTE first attach can take minutes)
 #define FAILED_RETRY_MS      30000  // back-off before next attempt
 
 // ---- internal helpers ----------------------------------------
@@ -122,13 +123,16 @@ Modem4gState modem4g_step(const char* apn) {
 
     // --------------------------------------------------------
     case Modem4gState::WAIT_NETWORK:
-        // Poll non-blockingly
-        if (s_modem.isNetworkConnected()) {
-            LOG_I("4G", "Network registered — attempting GPRS");
+        // Poll registration via CREG/CEREG (CS or LTE/EPS), NOT isNetworkConnected()
+        // (which checks packet/GPRS registration and stays false on JIO LTE-only).
+        if (modem4g_is_registered()) {
+            LOG_I("4G", "Network registered — attempting data attach");
             enter(Modem4gState::CONNECTING_GPRS);
         } else if ((int32_t)(millis() - s_netDeadline) >= 0) {
-            LOG_W("4G", "Network registration timeout");
-            enter(Modem4gState::FAILED);
+            // Do NOT power-cycle mid-search (audit S7). Re-issue RAT/APN config and
+            // extend the search instead of dropping the modem.
+            LOG_W("4G", "Registration still pending — re-issuing config (no power-cycle)");
+            enter(Modem4gState::WAIT_AT);
         }
         break;
 
@@ -172,6 +176,19 @@ bool modem4g_is_connected() {
     return s_state == Modem4gState::CONNECTED;
 }
 
+const char* modem4g_state_str() {
+    switch (s_state) {
+        case Modem4gState::OFF:             return "off";
+        case Modem4gState::POWERING:        return "powering";
+        case Modem4gState::WAIT_AT:         return "wait_at";
+        case Modem4gState::WAIT_NETWORK:    return "wait_net";
+        case Modem4gState::CONNECTING_GPRS: return "connecting";
+        case Modem4gState::CONNECTED:       return "connected";
+        case Modem4gState::FAILED:          return "failed";
+    }
+    return "?";
+}
+
 void modem4g_maintain() {
     if (s_state == Modem4gState::CONNECTED && !s_modem.isGprsConnected()) {
         LOG_W("4G", "GPRS dropped — will retry");
@@ -179,16 +196,26 @@ void modem4g_maintain() {
     }
 }
 
+// True once the modem is powered and AT-responsive (past power-up / AT probe),
+// so signal / operator / registration can be read even before a data (PDP)
+// connection exists. (S4 — don't hide status behind CONNECTED.)
+static bool modem_at_ready() {
+    return s_state == Modem4gState::WAIT_NETWORK ||
+           s_state == Modem4gState::CONNECTING_GPRS ||
+           s_state == Modem4gState::CONNECTED;
+}
+
 int modem4g_signal_dbm() {
-    if (s_state != Modem4gState::CONNECTED) return 0;
+    if (!modem_at_ready()) return 0;
     int16_t sq = s_modem.getSignalQuality();
     if (sq == 99 || sq <= 0) return 0;
     return -113 + sq * 2;
 }
 
 String modem4g_operator() {
-    if (s_state != Modem4gState::CONNECTED) return "N/A";
-    return s_modem.getOperator();
+    if (!modem_at_ready()) return "N/A";
+    String op = s_modem.getOperator();
+    return op.length() ? op : "N/A";
 }
 
 bool modem4g_get_time(struct tm* out) {

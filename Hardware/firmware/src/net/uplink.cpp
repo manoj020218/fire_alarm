@@ -25,6 +25,8 @@ static UplinkType s_active     = UplinkType::NONE;
 static Client*    s_client     = nullptr;   // MQTT
 static Client*    s_httpClient = nullptr;   // HTTP/api — separate socket from MQTT
 static Task       s_checkTask  = {0, UPLINK_CHECK_INTERVAL_MS};
+static Task       s_modemTask  = {0, 1500};  // drive modem ~every 1.5s (not every
+                                             // loop — hammering AT stalls registration)
 static bool       s_wifiInited = false;
 
 // Build the WiFi AP SSID from the gateway ID
@@ -37,24 +39,23 @@ static String ap_ssid() {
 }
 
 // ---- non-blocking probe — returns best available transport ---
+// The modem state machine is driven every loop() in uplink_loop() (fast cadence
+// + kept warm), so here we only CHECK its status. Priority: 4G > WiFi > LAN
+// (SIM-first; will become configurable via uplinkOrder).
 static UplinkType probe_transports() {
-    GatewayConfig& cfg = getConfig();
-
-    // --- 4G: advance state machine one step ---
-    modem4g_step(cfg.apn);
     if (modem4g_is_connected()) {
         return UplinkType::G4;
     }
 
-    // --- LAN: advance state machine one step ---
+    // WiFi STA: just poll (WiFi.begin was called in uplink_init)
+    if (wifi_sta_connected()) {
+        return UplinkType::WIFI;
+    }
+
+    // LAN: advance state machine one step
     eth_step();
     if (eth_is_connected()) {
         return UplinkType::LAN;
-    }
-
-    // --- WiFi STA: just poll (WiFi.begin was called in uplink_init) ---
-    if (wifi_sta_connected()) {
-        return UplinkType::WIFI;
     }
 
     return UplinkType::NONE;
@@ -79,6 +80,14 @@ void uplink_init() {
 }
 
 void uplink_loop() {
+    // Drive the 4G state machine on a ~1.5s cadence (not every 30s, not every
+    // loop). Fast enough that bring-up steps run at their real durations; slow
+    // enough that we don't flood the modem's AT port during registration. Runs
+    // even when WiFi/LAN is active → 4G stays warm for instant failover + SMS.
+    if (task_due(s_modemTask)) {
+        modem4g_step(getConfig().apn);
+    }
+
     // Periodic maintenance (non-blocking)
     modem4g_maintain();
     eth_maintain();
@@ -88,19 +97,11 @@ void uplink_loop() {
 
     UplinkType prev = s_active;
 
-    // Check if current transport is still alive
-    bool currentAlive = false;
-    switch (s_active) {
-        case UplinkType::G4:   currentAlive = modem4g_is_connected(); break;
-        case UplinkType::LAN:  currentAlive = eth_is_connected();     break;
-        case UplinkType::WIFI: currentAlive = wifi_sta_connected();   break;
-        default: break;
-    }
-
-    if (!currentAlive) {
-        // Re-probe all transports (each step call is non-blocking)
-        s_active = probe_transports();
-    }
+    // PREEMPTIVE selection: always pick the highest-priority transport that is up,
+    // so when 4G finishes attaching it TAKES OVER from WiFi (SIM-first), and if it
+    // later drops we fail back down the order. (Was sticky: only re-probed when the
+    // current transport died, so a higher-priority link coming up was ignored.)
+    s_active = probe_transports();
 
     // Update client pointers — MQTT and HTTP get SEPARATE sockets so an HTTP
     // request never clobbers the live MQTT connection.
