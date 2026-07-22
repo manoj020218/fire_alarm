@@ -13,6 +13,16 @@ static Preferences   s_prefs;
 
 GatewayConfig& getConfig() { return s_cfg; }
 
+static uint64_t esp32_mac_raw() {
+    return ESP.getEfuseMac();
+}
+
+static void format_gateway_id_from_mac(uint64_t mac, char* out, size_t outLen) {
+    if (!out || outLen == 0) return;
+    snprintf(out, outLen, "%s%04X", GATEWAY_ID_PREFIX,
+             static_cast<uint16_t>(mac >> 32) ^ static_cast<uint16_t>(mac));
+}
+
 // ---- helper macros -----------------------------------------
 #define STR_GET(k, dst, def)  strlcpy(dst, s_prefs.getString(k, def).c_str(), sizeof(dst))
 #define INT_GET(k, dst, def)  dst = s_prefs.getUInt(k, def)
@@ -179,11 +189,34 @@ void config_reset_to_defaults() {
 
 void config_derive_gateway_id() {
     if (strlen(s_cfg.gatewayId) == 0) {
-        uint64_t mac = ESP.getEfuseMac();
-        snprintf(s_cfg.gatewayId, sizeof(s_cfg.gatewayId),
-                 "%s%04X", GATEWAY_ID_PREFIX, (uint16_t)(mac >> 32) ^ (uint16_t)(mac));
+        format_gateway_id_from_mac(esp32_mac_raw(), s_cfg.gatewayId, sizeof(s_cfg.gatewayId));
         LOG_I("CFG", "Derived gatewayId: %s", s_cfg.gatewayId);
     }
+}
+
+String config_factory_gateway_id() {
+    char buf[24];
+    format_gateway_id_from_mac(esp32_mac_raw(), buf, sizeof(buf));
+    return String(buf);
+}
+
+String config_esp32_mac() {
+    uint64_t mac = esp32_mac_raw();
+    char buf[18];
+    snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+             static_cast<uint8_t>(mac >> 40), static_cast<uint8_t>(mac >> 32),
+             static_cast<uint8_t>(mac >> 24), static_cast<uint8_t>(mac >> 16),
+             static_cast<uint8_t>(mac >> 8), static_cast<uint8_t>(mac));
+    return String(buf);
+}
+
+String config_ap_ssid() {
+    if (strlen(s_cfg.gatewayId) >= 4) return String(s_cfg.gatewayId);
+    return config_factory_gateway_id();
+}
+
+bool config_gateway_id_matches_factory() {
+    return String(s_cfg.gatewayId) == config_factory_gateway_id();
 }
 
 // Apply SMS config pushed from the cloud (config/set) and persist to NVS.

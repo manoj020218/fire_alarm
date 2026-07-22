@@ -111,6 +111,10 @@ void config_load();                     // NVS → struct (fills defaults on fir
 void config_save();                     // struct → NVS
 void config_reset_to_defaults();        // factory reset (clears NVS namespace)
 void config_derive_gateway_id();        // build "JNX-FG-XXXX" from MAC if blank
+String config_factory_gateway_id();     // immutable hardware-derived gateway ID
+String config_esp32_mac();              // full ESP32 MAC, e.g. AA:BB:CC:DD:EE:FF
+String config_ap_ssid();                // AP SSID currently derived for this unit
+bool   config_gateway_id_matches_factory();
 void config_set_sms(const char* numbers, bool enabled);  // apply pushed SMS config + persist
 // Apply a pushed Modbus register map (config/set customSettings.registers) + persist.
 void config_set_registers(JsonArrayConst regs);

@@ -11,6 +11,7 @@
 #include "handlers_sms.h"
 #include "../ota/ota.h"
 #include "../net/uplink.h"
+#include "../net/modem4g.h"
 #include "../config/config.h"
 #include "../config/build_info.h"
 #include "../util/health.h"
@@ -39,10 +40,21 @@ bool webui_check_admin(AsyncWebServerRequest* req) {
 
 // ---- /api/status (open, read-only) --------------------------
 static void handle_status(AsyncWebServerRequest* req) {
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<1024> doc;
     doc["fw"]       = FW_VERSION;
     doc["hw"]       = HW_REVISION;
     doc["pid"]      = PRODUCT_ID;
+    doc["gatewayId"] = getConfig().gatewayId;
+    doc["factoryGatewayId"] = config_factory_gateway_id();
+    doc["apSsid"]   = config_ap_ssid();
+    doc["esp32Mac"] = config_esp32_mac();
+    doc["identityMatch"] = config_gateway_id_matches_factory();
+    String imei = modem4g_imei();
+    if (imei.length()) doc["imei"] = imei;
+    String iccid = modem4g_iccid();
+    if (iccid.length()) doc["iccid"] = iccid;
+    String imsi = modem4g_imsi();
+    if (imsi.length()) doc["imsi"] = imsi;
     doc["uptime"]   = health_uptime_s();
     doc["heap"]     = health_free_heap();
     doc["minHeap"]  = health_min_free_heap();
@@ -55,7 +67,7 @@ static void handle_status(AsyncWebServerRequest* req) {
     doc["mbTimeouts"]   = hc.modbusTimeouts;
     doc["alarmsActive"] = alarms_active_count();
 
-    char buf[512];
+    char buf[1024];
     serializeJson(doc, buf, sizeof(buf));
     req->send(200, "application/json", buf);
 }

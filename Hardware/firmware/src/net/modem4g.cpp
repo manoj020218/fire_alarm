@@ -787,6 +787,7 @@ bool modem4g_send_sms(const char* number, const char* text) {
 }
 
 String modem4g_iccid() {
+    if (!modem_at_ready()) return "";
     esp_task_wdt_reset();
     String v = s_modem.getSimCCID();
     esp_task_wdt_reset();
@@ -794,8 +795,17 @@ String modem4g_iccid() {
 }
 
 String modem4g_imsi() {
+    if (!modem_at_ready()) return "";
     esp_task_wdt_reset();
     String v = s_modem.getIMSI();
+    esp_task_wdt_reset();
+    return v;
+}
+
+String modem4g_imei() {
+    if (!modem_at_ready()) return "";
+    esp_task_wdt_reset();
+    String v = s_modem.getIMEI();
     esp_task_wdt_reset();
     return v;
 }

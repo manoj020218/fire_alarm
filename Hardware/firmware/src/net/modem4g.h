@@ -34,6 +34,7 @@ bool modem4g_delete_sms(int index);
 
 String modem4g_iccid();
 String modem4g_imsi();
+String modem4g_imei();
 int modem4g_signal_csq();
 String modem4g_own_number();
 String modem4g_ussd(const char* code);

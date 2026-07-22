@@ -98,8 +98,15 @@ function loadStatus(){
     var ub=document.getElementById('uplinkBadge');
     ub.textContent=d.uplink;ub.style.color=d.uplink==='none'?'#ef4444':'#22c55e';
     document.getElementById('tsLabel').textContent=new Date().toLocaleTimeString();
+    var warn = (!d.identityMatch)
+      ? '<div class="card" style="border-color:#dc2626;background:#3f1d1d"><h2 style="color:#fca5a5">Identity Warning</h2><p class="bad">Configured Gateway ID does not match factory hardware identity. Verify label, claim record, and provisioning before handover.</p></div>'
+      : '';
     var rows=[
       ['Firmware',d.fw],['HW',d.hw],['Product',d.pid],
+      ['Gateway ID',d.gatewayId],['Factory Gateway ID',d.factoryGatewayId],
+      ['AP SSID',d.apSsid],['ESP32 MAC',d.esp32Mac],
+      ['Identity Match',d.identityMatch?'yes':'no'],
+      ['Modem IMEI',d.imei||'-'],['SIM ICCID',d.iccid||'-'],['SIM IMSI',d.imsi||'-'],
       ['Uptime (s)',d.uptime],['Free Heap',d.heap+' B'],['Min Heap',d.minHeap+' B'],
       ['Uplink',d.uplink],['4G Signal',d.signal4g+' dBm'],['LAN Link',d.signalLan?'yes':'no'],
       ['MQTT Reconnects',d.mqttReconns],['MB Timeouts',d.mbTimeouts],
@@ -108,7 +115,7 @@ function loadStatus(){
     var html='<div class="card"><h2>System Status</h2><table><tr><th>Key</th><th>Value</th></tr>';
     rows.forEach(function(r){html+='<tr><td>'+h(r[0])+'</td><td>'+h(r[1])+'</td></tr>';});
     html+='</table></div>';
-    document.getElementById('status').innerHTML=html;
+    document.getElementById('status').innerHTML=warn+html;
   }).catch(function(){document.getElementById('status').innerHTML='<div class="card"><span class="bad">Cannot reach /api/status</span></div>';});
 }
 

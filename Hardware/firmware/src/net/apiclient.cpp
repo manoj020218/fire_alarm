@@ -9,8 +9,10 @@
 #include "../config/config.h"
 #include "../config/defaults.h"
 #include "../config/build_info.h"
+#include "modem4g.h"
 #include "../util/log.h"
 #include <ArduinoHttpClient.h>
+#include <ArduinoJson.h>
 #include <Preferences.h>
 
 static char s_token[33] = {};  // 32 hex + NUL
@@ -167,15 +169,34 @@ ApiResponse api_get(const char* path) {
 }
 
 // ---- Register device token with VPS -------------------------
-// POST /api/fireguard/register {gatewayId, token, hw, fw}
+// POST /api/fireguard/register
+// {gatewayId, token, hw, fw, factoryGatewayId, esp32Mac, apSsid, modemImei, iccid, imsi}
 // Teaches the VPS this gateway's self-generated token so /backup (and other
 // device-authed calls) will authenticate. Idempotent on the backend.
 bool api_register() {
     GatewayConfig& cfg = getConfig();
-    char body[256];
-    snprintf(body, sizeof(body),
-             "{\"gatewayId\":\"%s\",\"token\":\"%s\",\"hw\":\"%s\",\"fw\":\"%s\"}",
-             cfg.gatewayId, api_get_token(), HW_REVISION, FW_VERSION);
+    StaticJsonDocument<512> doc;
+    doc["gatewayId"] = cfg.gatewayId;
+    doc["token"] = api_get_token();
+    doc["hw"] = HW_REVISION;
+    doc["fw"] = FW_VERSION;
+    doc["factoryGatewayId"] = config_factory_gateway_id();
+    doc["esp32Mac"] = config_esp32_mac();
+    doc["apSsid"] = config_ap_ssid();
+
+    String imei = modem4g_imei();
+    if (imei.length()) doc["modemImei"] = imei;
+    String iccid = modem4g_iccid();
+    if (iccid.length()) doc["iccid"] = iccid;
+    String imsi = modem4g_imsi();
+    if (imsi.length()) doc["imsi"] = imsi;
+
+    char body[512];
+    size_t n = serializeJson(doc, body, sizeof(body));
+    if (n == 0 || n >= sizeof(body)) {
+        LOG_E("API", "Register payload overflow");
+        return false;
+    }
 
     ApiResponse resp = api_post("/register", body);
     if (resp.status == 200) {

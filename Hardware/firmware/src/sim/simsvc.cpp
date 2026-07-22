@@ -32,6 +32,8 @@ static void publishSim(JsonDocument& doc) {
 static void doSimInfo() {
     DynamicJsonDocument doc(1024);
     doc["type"]     = "sim_info";
+    String imei = modem4g_imei();
+    if (imei.length()) doc["imei"] = imei;
     doc["iccid"]    = modem4g_iccid();
     doc["imsi"]     = modem4g_imsi();
     String num = modem4g_own_number();

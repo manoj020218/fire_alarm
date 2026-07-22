@@ -1,5 +1,6 @@
 #include "callsvc.h"
 
+#include "../config/build_info.h"
 #include "../config/config.h"
 #include "../net/modem4g.h"
 #include "../util/log.h"
@@ -163,6 +164,39 @@ static String normalize_command_text(const String& src) {
     return s;
 }
 
+static String iccid_tail(const String& iccid) {
+    if (!iccid.length()) return "NA";
+    if (iccid.length() <= 6) return iccid;
+    return String("...") + iccid.substring(iccid.length() - 6);
+}
+
+static void send_identity_sms(const char* sender) {
+    if (!sender || !sender[0]) return;
+
+    String msg = "FG ID ";
+    msg += "GW=";
+    msg += getConfig().gatewayId;
+    msg += " FACT=";
+    msg += config_factory_gateway_id();
+    msg += " AP=";
+    msg += config_ap_ssid();
+    msg += " MAC=";
+    msg += config_esp32_mac();
+
+    String imei = modem4g_imei();
+    msg += " IMEI=";
+    msg += imei.length() ? imei : "NA";
+
+    msg += " ICCID=";
+    msg += iccid_tail(modem4g_iccid());
+
+    msg += " FW=";
+    msg += FW_VERSION;
+
+    bool ok = modem4g_send_sms(sender, msg.c_str());
+    LOG_I("CALL", "FG ID reply %s to %s", ok ? "sent" : "failed", sender);
+}
+
 static void handle_stop_for_index(int idx) {
     if (idx < 0 || idx >= MAX_CALL_RECIPIENTS) return;
     s_stopMask |= (1u << idx);
@@ -246,6 +280,9 @@ static void poll_control_sms() {
                 consumed = true;
             } else if (cmd.indexOf("FG ARM") >= 0) {
                 handle_arm();
+                consumed = true;
+            } else if (cmd.indexOf("FG ID") >= 0) {
+                send_identity_sms(sender.c_str());
                 consumed = true;
             }
 
