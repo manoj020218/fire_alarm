@@ -26,7 +26,7 @@ static Client*    s_client     = nullptr;   // MQTT
 static Client*    s_httpClient = nullptr;   // HTTP/api — separate socket from MQTT
 static Task       s_checkTask  = {0, UPLINK_CHECK_INTERVAL_MS};
 static Task       s_modemTask  = {0, 1500};  // drive modem ~every 1.5s (not every
-                                             // loop — hammering AT stalls registration)
+                                             // loop - hammering AT stalls registration)
 static bool       s_wifiInited = false;
 // Per-transport "cloud unreachable" cooldown (indexed by UplinkType). While a
 // transport is avoided we don't prefer it, so the gateway fails over to one that
@@ -36,6 +36,15 @@ static uint32_t   s_avoidUntil[4] = {0, 0, 0, 0};
 static bool avoided(UplinkType t) {
     uint32_t until = s_avoidUntil[(int)t];
     return until != 0 && (int32_t)(millis() - until) < 0;
+}
+
+static bool transport_connected(UplinkType t) {
+    switch (t) {
+        case UplinkType::G4:   return modem4g_is_connected();
+        case UplinkType::LAN:  return eth_is_connected();
+        case UplinkType::WIFI: return wifi_sta_connected();
+        default:               return false;
+    }
 }
 
 // Build the WiFi AP SSID from the gateway ID
@@ -134,6 +143,12 @@ void uplink_loop() {
     eth_maintain();
     wifi_maintain();
 
+    // If the selected transport has dropped out underneath us, force an immediate
+    // re-probe so cloud traffic stops using a stale path.
+    if (s_active != UplinkType::NONE && !transport_connected(s_active)) {
+        task_trigger_now(s_checkTask);
+    }
+
     if (!task_due(s_checkTask)) return;
 
     UplinkType prev = s_active;
@@ -163,7 +178,9 @@ void uplink_loop() {
     }
 }
 
-bool uplink_is_up() { return s_active != UplinkType::NONE && s_client != nullptr; }
+bool uplink_is_up() {
+    return s_active != UplinkType::NONE && s_client != nullptr && transport_connected(s_active);
+}
 
 UplinkType uplink_active_type() { return s_active; }
 

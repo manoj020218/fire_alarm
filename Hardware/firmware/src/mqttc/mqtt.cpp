@@ -147,7 +147,7 @@ static bool do_connect() {
     s_mqtt.setServer(cfg.mqttHost, cfg.mqttPort);
     s_mqtt.setCallback(on_message);
     s_mqtt.setKeepAlive(60);
-    s_mqtt.setSocketTimeout(5);
+    s_mqtt.setSocketTimeout(15);
 
     String willTopic = topic_status();
     const char* willMsg = "{\"online\":false}";

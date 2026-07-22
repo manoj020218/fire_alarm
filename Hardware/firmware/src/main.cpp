@@ -48,6 +48,11 @@ static Task tRegister   = {0, 15000};  // retry VPS device-token registration
 static bool s_registered    = false;
 static bool s_bootOtaChecked = false;
 
+static bool cellular_bootstrap_busy() {
+    return uplink_active_type() == UplinkType::G4 &&
+           health_counters().mqttReconnects == 0;
+}
+
 // ---- LED heartbeat ------------------------------------------
 static bool s_ledState = false;
 
@@ -190,7 +195,9 @@ static void on_alarm_event(const AlarmEvent& ev) {
         // HTTP alarm fallback
         char buf[256];
         serializeJson(doc, buf, sizeof(buf));
-        mqtt_http_fallback_alarm(buf);
+        if (!cellular_bootstrap_busy()) {
+            mqtt_http_fallback_alarm(buf);
+        }
     }
 
     // SMS alerting (Change 3): only on newly-raised CRITICAL alarms
@@ -262,7 +269,9 @@ static void publish_telemetry() {
                 s_sdFailLogMs = now;
             }
         }
-        mqtt_http_fallback_telemetry(buf);
+        if (!cellular_bootstrap_busy()) {
+            mqtt_http_fallback_telemetry(buf);
+        }
     }
 }
 
@@ -371,39 +380,47 @@ void loop() {
 
     // Uplink maintenance
     uplink_loop();
+    esp_task_wdt_reset();
 
     // MQTT keepalive / reconnect
     mqtt_loop();
+    esp_task_wdt_reset();
 
     // Run any queued on-demand SIM command (blocking AT, off the MQTT callback)
     simsvc_step();
+    esp_task_wdt_reset();
 
     // Replay SD buffer when MQTT reconnects
     replay_sd_buffer();
 
     // WebUI + OTA validation tick
     webui_loop();
+    esp_task_wdt_reset();
 
     // Modbus: one device per tick
     if (task_due(tModbus)) {
         modbus_poll();
+        esp_task_wdt_reset();
     }
 
     // Alarm evaluation
     if (task_due(tAlarms)) {
         alarms_evaluate();
+        esp_task_wdt_reset();
     }
 
     // Telemetry publish
     if (task_due(tTelemetry)) {
         tTelemetry.intervalMs = getConfig().telemetryIntervalMs;
         publish_telemetry();
+        esp_task_wdt_reset();
     }
 
     // Status publish
     if (task_due(tStatus)) {
         tStatus.intervalMs = getConfig().statusIntervalMs;
         publish_status();
+        esp_task_wdt_reset();
     }
 
     // VPS registration (one-time): teach the backend our device token so
@@ -411,28 +428,32 @@ void loop() {
     // uplink is up and the backend accepts; then does a boot-time OTA check so
     // a cloud push isn't blind for up to 24 h.
     if (!s_registered && task_due(tRegister)) {
-        if (uplink_is_up() && api_register()) {
+        if (!cellular_bootstrap_busy() && uplink_is_up() && api_register()) {
             s_registered = true;
             if (!s_bootOtaChecked) {
                 ota_request_check();   // boot check (deferred, runs in ota_service)
                 s_bootOtaChecked = true;
             }
         }
+        esp_task_wdt_reset();
     }
 
     // Service any queued OTA work (check / update). Runs the blocking HTTP here
-    // on the loop task — never on the MQTT callback or WebServer async task.
+    // on the loop task - never on the MQTT callback or WebServer async task.
     ota_service();
+    esp_task_wdt_reset();
 
     // OTA periodic manifest check
     if (task_due(tOta)) {
         tOta.intervalMs = getConfig().otaCheckIntervalMs;
         ota_check_manifest();
+        esp_task_wdt_reset();
     }
 
     // Time sync (hourly attempt; rtc_maybe_sync guards 23h internally)
     if (task_due(tTimeSync)) {
         rtc_maybe_sync();
+        esp_task_wdt_reset();
     }
 
     // LED heartbeat
@@ -443,11 +464,13 @@ void loop() {
     // Auto-reboot check (once per minute)
     if (task_due(tReboot)) {
         check_auto_reboot();
+        esp_task_wdt_reset();
     }
 
     // DI1 factory-reset long-press (every 100 ms)
     if (task_due(tDi1Guard)) {
         check_factory_reset_pin();
+        esp_task_wdt_reset();
     }
 
     // OTA mark valid once the new image proves it can bring up an uplink.

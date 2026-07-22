@@ -10,9 +10,89 @@
 #include <esp_task_wdt.h>
 #include <cstring>
 
+#define MODEM_MQTT_CONNECT_TIMEOUT_S 12
+#define MODEM_HTTP_CONNECT_TIMEOUT_S 10
+
+static bool data_service_is_open();
+static bool open_data_service();
+
+static int wait_for_cipopen_result(TinyGsm& modem, uint8_t mux, uint32_t timeoutMs) {
+    String data;
+    data.reserve(96);
+
+    const String okRsp    = String(AT_NL "+CIPOPEN: ") + mux + ",0" + AT_NL;
+    const String failRsp1 = String(AT_NL "+CIPOPEN: ") + mux + ",1" + AT_NL;
+    const String failRsp4 = String(AT_NL "+CIPOPEN: ") + mux + ",4" + AT_NL;
+
+    uint32_t start = millis();
+    do {
+        TINY_GSM_YIELD();
+        while (modem.stream.available() > 0) {
+            TINY_GSM_YIELD();
+            int a = modem.stream.read();
+            if (a <= 0) continue;
+            data += static_cast<char>(a);
+
+            if (data.endsWith(okRsp)) return 1;
+            if (data.endsWith(failRsp1)) return 2;
+            if (data.endsWith(failRsp4)) return 3;
+            if (data.endsWith("ERROR" AT_NL)) return 4;
+            if (data.endsWith("CLOSE OK" AT_NL)) return 5;
+            if (modem.handleURCs(data)) data = "";
+        }
+    } while (millis() - start < timeoutMs);
+
+    return 0;
+}
+
+class BoundedTinyGsmClient : public TinyGsmClient {
+public:
+    BoundedTinyGsmClient(TinyGsm& modem, uint8_t mux, int timeoutS)
+        : TinyGsmClient(modem, mux), m_timeoutS(timeoutS) {}
+
+    int connect(const char* host, uint16_t port, int timeout_s) override {
+        stop();
+        TINY_GSM_YIELD();
+        rx.clear();
+        sock_available = 0;
+        got_data = false;
+        at->streamClear();
+
+        // A7672X must be in manual receive mode or PubSubClient never sees
+        // the broker CONNACK through the CIPRXGET-based read path.
+        at->sendAT(GF("+CIPRXGET=1"));
+        if (at->waitResponse(2000L) != 1) {
+            sock_connected = false;
+            return false;
+        }
+
+        if (!data_service_is_open() && !open_data_service()) {
+            sock_connected = false;
+            return false;
+        }
+
+        at->sendAT(GF("+CIPOPEN="), mux, GF(",\"TCP\",\""), host, GF("\","), port);
+        sock_connected =
+            (wait_for_cipopen_result(*at, mux, static_cast<uint32_t>(timeout_s) * 1000UL) == 1);
+        return sock_connected;
+    }
+
+    int connect(const char* host, uint16_t port) override {
+        return connect(host, port, m_timeoutS);
+    }
+
+    int connect(IPAddress ip, uint16_t port) override {
+        String host = TinyGsmClient::TinyGsmStringFromIp(ip);
+        return connect(host.c_str(), port, m_timeoutS);
+    }
+
+private:
+    int m_timeoutS;
+};
+
 static TinyGsm       s_modem(Serial1);
-static TinyGsmClient s_client(s_modem, 0);      // MQTT - mux 0
-static TinyGsmClient s_httpClient(s_modem, 1);  // HTTP/API - mux 1
+static BoundedTinyGsmClient s_client(s_modem, 0, MODEM_MQTT_CONNECT_TIMEOUT_S);      // MQTT - mux 0
+static BoundedTinyGsmClient s_httpClient(s_modem, 1, MODEM_HTTP_CONNECT_TIMEOUT_S);  // HTTP/API - mux 1
 
 static Modem4gState s_state = Modem4gState::OFF;
 static uint32_t s_stateTs = 0;
@@ -162,6 +242,55 @@ static void reset_data_plane() {
     esp_task_wdt_reset();
 }
 
+static bool attach_data_plane(const char* apn) {
+    if (!apn || !apn[0]) return false;
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CGDCONT=1,\"IP\",\""), apn, '"');
+    if (s_modem.waitResponse(5000L) != 1) return false;
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CGACT=1,1"));
+    if (s_modem.waitResponse(15000L) != 1) return false;
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CGATT=1"));
+    if (s_modem.waitResponse(15000L) != 1) return false;
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CIPRXGET=1"));
+    if (s_modem.waitResponse(3000L) != 1) return false;
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CGPADDR=1"));
+    if (s_modem.waitResponse(10000L) != 1) return false;
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\""));
+    if (s_modem.waitResponse(5000L) != 1) return false;
+
+    // Apply the known-good SIMCOM TCP socket settings used by the mature
+    // SIM7600 path. The A7672X driver does not configure these itself.
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CIPMODE=0"));
+    s_modem.waitResponse(3000L);
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CIPSENDMODE=0"));
+    s_modem.waitResponse(3000L);
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CIPCCFG=10,0,0,0,1,0,75000"));
+    s_modem.waitResponse(5000L);
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CIPTIMEOUT=75000,15000,15000"));
+    s_modem.waitResponse(5000L);
+
+    esp_task_wdt_reset();
+    return true;
+}
+
 // Open the modem's embedded TCP/IP service (NETOPEN) so TinyGsmClient sockets
 // (CIPOPEN) actually work. The "isGprsConnected() shortcut" only confirms the PDP
 // context (CGATT) is up — without NETOPEN every socket connect fails, which is why
@@ -170,18 +299,44 @@ static void reset_data_plane() {
 static bool data_service_is_open() {
     esp_task_wdt_reset();
     s_modem.sendAT(GF("+NETOPEN?"));
-    int rsp = s_modem.waitResponse(3000L, GF("+NETOPEN: 1"), GF("+NETOPEN: 0"),
-                                   GF("ERROR"));
+    int rsp = s_modem.waitResponse(3000L, GF(AT_NL "+NETOPEN: 1"),
+                                   GF(AT_NL "+NETOPEN: 0"), GF("ERROR"));
     s_modem.waitResponse(300L);
     esp_task_wdt_reset();
-    return rsp == 1;
+    if (rsp != 1) return false;
+
+    // Mirror the working SIM7600/SIM5360 logic: socket service is only useful if
+    // the modem also reports a socket-PDP address after NETOPEN is active.
+    s_modem.sendAT(GF("+IPADDR"));
+    int ipRsp = s_modem.waitResponse(3000L);
+    esp_task_wdt_reset();
+    return ipRsp == 1;
 }
 
-static void close_data_service() {
+static bool open_data_service() {
+    if (data_service_is_open()) return true;
+
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+NETOPEN"));
+    // SIMCOM returns an immediate OK, then later emits +NETOPEN: 0 when the
+    // socket service is actually ready. Ignore the immediate OK and wait for
+    // the URC, otherwise NETOPEN? is polled too early and we false-fail.
+    int rsp = s_modem.waitResponse(25000L, GF(AT_NL "+NETOPEN: 0"), GF("ERROR"));
+    esp_task_wdt_reset();
+    if (rsp == 1 && data_service_is_open()) return true;
+
+    // Some firmware revisions report success late or return a generic error when
+    // the service is already up. Final state verification is what matters.
+    return data_service_is_open();
+}
+
+static bool close_data_service() {
     esp_task_wdt_reset();
     s_modem.sendAT(GF("+NETCLOSE"));
-    s_modem.waitResponse(12000L);
+    int rsp = s_modem.waitResponse(15000L, GF(AT_NL "+NETCLOSE: 0"), GF("ERROR"));
     esp_task_wdt_reset();
+    if (rsp == 1) return true;
+    return !data_service_is_open();
 }
 
 static void ensure_data_service_legacy() {
@@ -201,18 +356,11 @@ static bool ensure_data_service() {
     if (data_service_is_open()) return true;
 
     LOG_I("4G", "Opening TCP/IP service (NETOPEN)");
-    esp_task_wdt_reset();
-    s_modem.sendAT(GF("+NETOPEN"));
-    s_modem.waitResponse(12000L);
-    esp_task_wdt_reset();
-    if (data_service_is_open()) return true;
+    if (open_data_service()) return true;
 
     LOG_W("4G", "NETOPEN did not verify - restarting TCP/IP service");
     close_data_service();
-    s_modem.sendAT(GF("+NETOPEN"));
-    s_modem.waitResponse(12000L);
-    esp_task_wdt_reset();
-    if (data_service_is_open()) return true;
+    if (open_data_service()) return true;
 
     LOG_W("4G", "NETOPEN still not verified");
     return false;
@@ -424,7 +572,7 @@ Modem4gState modem4g_step(const char* apn) {
                 s_gprsRetryTs = millis();
                 LOG_I("4G", "Data attach APN='%s'", selectedApn);
                 esp_task_wdt_reset();
-                bool ok = s_modem.gprsConnect(selectedApn, "", "");
+                bool ok = attach_data_plane(selectedApn);
                 esp_task_wdt_reset();
                 if (ok || s_modem.isGprsConnected()) {
                     if (ensure_data_service()) {
