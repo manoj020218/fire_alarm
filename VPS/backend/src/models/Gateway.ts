@@ -25,6 +25,16 @@ export interface ISmsInboxItem {
   ts?: string;
 }
 
+/** Append-only audit entry for a gateway's claim code lifecycle. */
+export interface IClaimCodeEvent {
+  code: string;
+  /** 'issued' | 'claimed' | 'rotated' | 'revoked' */
+  event: string;
+  at: Date;
+  /** actor — userId/email that performed it, or 'system' */
+  by?: string;
+}
+
 /** Latest SIM/cellular status reported by the gateway (on demand or periodic). */
 export interface ISimInfo {
   iccid?: string;
@@ -67,6 +77,22 @@ export interface IGateway {
   smsConfig?: ISmsConfig;
   /** Latest SIM/cellular status */
   sim?: ISimInfo;
+
+  // ── Hardware identity (self-reported at /register; TOFU-bound on first sight) ──
+  /** Immutable hardware-derived gateway ID (from ESP32 MAC), printed at factory */
+  factoryGatewayId?: string;
+  /** Full ESP32 MAC, e.g. AA:BB:CC:DD:EE:FF — the strongest hardware identity */
+  esp32Mac?: string;
+  /** SoftAP SSID the unit broadcasts, e.g. JNX-FG-08F6 */
+  apSsid?: string;
+  /** 4G modem IMEI */
+  modemImei?: string;
+  /** true when a re-register presented a different bound identity (possible swap) */
+  identityMismatch?: boolean;
+  /** last time the device identity was checked against the bound values */
+  identityLastVerifiedAt?: Date;
+  /** Append-only audit of claim-code issue/claim/rotate/revoke events */
+  claimCodeHistory?: IClaimCodeEvent[];
 }
 
 export interface IGatewayDocument extends IGateway, Document {}
@@ -140,6 +166,22 @@ const GatewaySchema = new Schema<IGatewayDocument>(
       messages: [{ from: String, text: String, ts: String, _id: false }],
       lastCheckedAt: { type: Date },
     },
+    // ── Hardware identity ──────────────────────────────────────────────────────
+    factoryGatewayId: { type: String, trim: true, uppercase: true },
+    esp32Mac: { type: String, trim: true, uppercase: true },
+    apSsid: { type: String, trim: true, maxlength: 64 },
+    modemImei: { type: String, trim: true, maxlength: 32 },
+    identityMismatch: { type: Boolean, default: false },
+    identityLastVerifiedAt: { type: Date },
+    claimCodeHistory: [
+      {
+        code: { type: String, trim: true, uppercase: true },
+        event: { type: String, trim: true },
+        at: { type: Date, default: Date.now },
+        by: { type: String, trim: true },
+        _id: false,
+      },
+    ],
   },
   {
     timestamps: true,
@@ -152,6 +194,15 @@ GatewaySchema.index({ siteId: 1 });
 GatewaySchema.index({ deviceToken: 1 }); // Fast device auth
 GatewaySchema.index({ online: 1 });
 GatewaySchema.index({ lastSeenAt: 1 }); // Heartbeat monitor
+
+// Hardware/SIM identity lookups (sparse — only devices that have reported them).
+// Non-unique: identity dupes are surfaced via identityMismatch for admin review
+// rather than hard-rejected at write time.
+GatewaySchema.index({ factoryGatewayId: 1 }, { sparse: true });
+GatewaySchema.index({ esp32Mac: 1 }, { sparse: true });
+GatewaySchema.index({ modemImei: 1 }, { sparse: true });
+GatewaySchema.index({ 'sim.iccid': 1 }, { sparse: true });
+GatewaySchema.index({ 'sim.imsi': 1 }, { sparse: true });
 
 export const Gateway: Model<IGatewayDocument> = mongoose.model<IGatewayDocument>(
   'Gateway',

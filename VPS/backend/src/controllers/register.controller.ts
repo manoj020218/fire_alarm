@@ -18,16 +18,23 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
-import { Gateway } from '../models/Gateway';
+import { Gateway, ISimInfo } from '../models/Gateway';
 import logger from '../config/logger';
 
 export const registerDevice = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { gatewayId, token, hw, fw } = req.body as {
-    gatewayId?: string;
-    token?: string;
-    hw?: string;
-    fw?: string;
-  };
+  const { gatewayId, token, hw, fw, factoryGatewayId, esp32Mac, apSsid, modemImei, iccid, imsi } =
+    req.body as {
+      gatewayId?: string;
+      token?: string;
+      hw?: string;
+      fw?: string;
+      factoryGatewayId?: string;
+      esp32Mac?: string;
+      apSsid?: string;
+      modemImei?: string;
+      iccid?: string;
+      imsi?: string;
+    };
 
   if (!gatewayId || !token || token.length < 16) {
     throw AppError.badRequest('gatewayId and a valid token are required');
@@ -53,10 +60,54 @@ export const registerDevice = asyncHandler(async (req: Request, res: Response): 
 
   if (!tokenMatches) {
     gateway.deviceToken = token;
-    if (fw) gateway.fw = fw;
-    await gateway.save();
-    logger.info({ gatewayId, hw, fw }, 'Device registered (token stored)');
+  }
+  if (fw) gateway.fw = fw;
+  if (hw) gateway.hw = hw;
+
+  // ── Hardware-identity TOFU + mismatch detection ────────────────────────────
+  // esp32Mac (and its derived factoryGatewayId) is the strongest identity: bind
+  // it on first sight. A later register presenting a DIFFERENT bound identity is
+  // flagged (identityMismatch) for admin review — a possible hardware swap or
+  // token reuse — rather than silently rebinding. Modem/SIM/AP details are
+  // mutable (swappable), so those are refreshed to the latest reported values.
+  const incomingMac = esp32Mac ? esp32Mac.toUpperCase() : undefined;
+  const incomingFactoryId = factoryGatewayId ? factoryGatewayId.toUpperCase() : undefined;
+
+  if (incomingMac && !gateway.esp32Mac) gateway.esp32Mac = incomingMac;
+  if (incomingFactoryId && !gateway.factoryGatewayId) gateway.factoryGatewayId = incomingFactoryId;
+
+  const mismatch =
+    (!!gateway.esp32Mac && !!incomingMac && gateway.esp32Mac !== incomingMac) ||
+    (!!gateway.factoryGatewayId &&
+      !!incomingFactoryId &&
+      gateway.factoryGatewayId !== incomingFactoryId);
+
+  gateway.identityMismatch = mismatch;
+  gateway.identityLastVerifiedAt = new Date();
+  if (mismatch) {
+    logger.warn(
+      { gatewayId, boundMac: gateway.esp32Mac, presentedMac: incomingMac },
+      'register: HARDWARE IDENTITY MISMATCH — flagged for review'
+    );
   }
 
-  res.json({ ok: true, gatewayId: gateway.gatewayId, registered: true });
+  // Informational / mutable identity fields — refresh to the latest reported.
+  if (apSsid) gateway.apSsid = apSsid;
+  if (modemImei) gateway.modemImei = modemImei;
+  if (iccid || imsi) {
+    const sim: ISimInfo = gateway.sim ?? {};
+    if (iccid) sim.iccid = iccid;
+    if (imsi) sim.imsi = imsi;
+    gateway.sim = sim;
+  }
+
+  await gateway.save();
+  logger.info({ gatewayId, hw, fw, identityMismatch: mismatch }, 'Device registered');
+
+  res.json({
+    ok: true,
+    gatewayId: gateway.gatewayId,
+    registered: true,
+    identityMismatch: mismatch,
+  });
 });
