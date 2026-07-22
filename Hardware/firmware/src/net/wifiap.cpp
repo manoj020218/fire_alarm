@@ -19,14 +19,18 @@ static WiFiClient s_client;      // MQTT (persistent connection)
 static WiFiClient s_httpClient;  // HTTP/api calls — MUST be separate from MQTT's
 static bool       s_staUp  = false;
 static bool       s_apUp   = false;
+static char       s_apSsid[32] = {0};
 
 bool wifi_begin(const char* ssid, const char* pass, const char* apSsid) {
+    WiFi.mode(WIFI_AP_STA);
+    if (apSsid) strlcpy(s_apSsid, apSsid, sizeof(s_apSsid));
+
     // Start AP for provisioning (always, even if STA connects)
     if (!s_apUp) {
-        WiFi.softAP(apSsid, nullptr, WIFI_AP_CHANNEL);
+        WiFi.softAP(s_apSsid, nullptr, WIFI_AP_CHANNEL);
         s_apUp = true;
         LOG_I("WIFI", "AP started  SSID=%s  IP=%s",
-              apSsid, WiFi.softAPIP().toString().c_str());
+              s_apSsid, WiFi.softAPIP().toString().c_str());
     }
 
     if (ssid && strlen(ssid) > 0) {
@@ -46,6 +50,13 @@ bool wifi_sta_connected() {
 }
 
 void wifi_maintain() {
+    if (s_apUp && !(WiFi.getMode() & WIFI_AP)) {
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP(s_apSsid, nullptr, WIFI_AP_CHANNEL);
+        LOG_W("WIFI", "AP restored  SSID=%s  IP=%s",
+              s_apSsid, WiFi.softAPIP().toString().c_str());
+    }
+
     bool now = wifi_sta_connected();
     if (s_staUp && !now) {
         LOG_W("WIFI", "STA dropped");

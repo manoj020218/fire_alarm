@@ -4,6 +4,7 @@
 #include "simsvc.h"
 #include <ArduinoJson.h>
 #include "../net/modem4g.h"
+#include "../call/callsvc.h"
 #include "../mqttc/topics.h"
 #include "../mqttc/mqtt.h"
 #include "../util/log.h"
@@ -71,20 +72,29 @@ static void doTestCall() {
     DynamicJsonDocument doc(512);
     doc["type"] = "test_call";
     if (!s_number[0]) { doc["ok"] = false; doc["error"] = "no number"; publishSim(doc); return; }
+    if (callsvc_is_running()) {
+        doc["ok"] = false;
+        doc["error"] = "automatic alarm call cycle active - ack/disarm the incident before manual test";
+        publishSim(doc);
+        return;
+    }
     bool ok = modem4g_call(s_number);
     doc["ok"] = ok;
-    if (!ok) doc["error"] = "call failed (check registration / VoLTE)";
+    if (!ok) {
+        const char* err = modem4g_call_last_error();
+        doc["error"] = (err && err[0]) ? err : "call failed";
+    }
     publishSim(doc);
 }
 
 static void doReadSms() {
     String raw = modem4g_read_sms_raw();
-    DynamicJsonDocument doc(4096);
+    DynamicJsonDocument doc(1024);
     doc["type"] = "sms_list";
     JsonArray arr = doc.createNestedArray("messages");
 
     int idx = 0;
-    while (arr.size() < 10) {
+    while (arr.size() < 3) {
         int h = raw.indexOf("+CMGL:", idx);
         if (h < 0) break;
         int lineEnd = raw.indexOf('\n', h);
@@ -107,10 +117,11 @@ static void doReadSms() {
         if (body.length()) {
             JsonObject m = arr.createNestedObject();
             if (sender.length()) m["from"] = sender;
-            m["text"] = body.substring(0, 300);
+            m["text"] = body.substring(0, 60);
         }
         idx = (next < 0) ? raw.length() : next;
     }
+    doc["truncated"] = (arr.size() >= 3);
     doc["ok"] = true;
     publishSim(doc);
 }

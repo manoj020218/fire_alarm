@@ -89,17 +89,32 @@ static void dispatch_config(const char* json, unsigned int len) {
     DynamicJsonDocument doc(4096);   // register maps can hold up to 32 devices
     if (deserializeJson(doc, json, len) != DeserializationError::Ok) return;
 
+    bool saveCfg = false;
+
     JsonVariantConst sms = doc["customSettings"]["sms"];
     if (!sms.isNull()) {
         const char* numbers = sms["numbers"] | "";
         bool enabled        = sms["enabled"] | false;
         config_set_sms(numbers, enabled);
         LOG_I("MQTT", "config/set: SMS updated (enabled=%d)", enabled ? 1 : 0);
+        saveCfg = false;  // config_set_sms already persisted
+    }
+
+    JsonVariantConst call = doc["customSettings"]["call"];
+    if (!call.isNull()) {
+        getConfig().callEnabled = call["enabled"] | getConfig().callEnabled;
+        LOG_I("MQTT", "config/set: Call updated (enabled=%d)", getConfig().callEnabled ? 1 : 0);
+        saveCfg = true;
     }
 
     JsonArrayConst regs = doc["customSettings"]["registers"];
     if (!regs.isNull()) {
         config_set_registers(regs);
+        saveCfg = false;  // config_set_registers already persisted
+    }
+
+    if (saveCfg) {
+        config_save();
     }
 }
 

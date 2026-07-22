@@ -141,6 +141,7 @@ function buildConfigForm(d){
   '<div><label>Admin Password</label><input id="cAdminPw" type="password" placeholder="(unchanged)"></div></div>'+
   '<div class="row"><div><label>SMS Alert Numbers (comma-separated E.164)</label><input id="cSmsNums" value="'+h(d.smsNumbers||'')+'" placeholder="+91XXXXXXXXXX,+91XXXXXXXXXX"></div>'+
   '<div style="display:flex;flex-direction:column;gap:.35rem"><label>SMS Enabled<input id="cSmsEn" type="checkbox"'+(d.smsEnabled?' checked':'')+' style="width:auto;margin-left:.4rem"></label>'+
+  '<label>Call Alerts Enabled<input id="cCallEn" type="checkbox"'+(d.callEnabled?' checked':'')+' style="width:auto;margin-left:.4rem"></label>'+
   '<button class="act sec" style="margin-top:.35rem" onclick="testSms()">Send Test SMS</button></div></div>'+
   '<div style="margin-top:.75rem;display:flex;gap:.5rem">'+
   '<button class="act" onclick="saveConfig()">Save &amp; Reboot</button>'+
@@ -152,7 +153,7 @@ function buildConfigForm(d){
 }
 function saveConfig(){
   if(!checkAuth())return;
-  var body={env:document.getElementById('cEnv').value,siteId:document.getElementById('cSite').value,gatewayId:document.getElementById('cGw').value,apn:document.getElementById('cApn').value,mqttHost:document.getElementById('cMqttH').value,mqttPort:parseInt(document.getElementById('cMqttP').value),mqttUser:document.getElementById('cMqttU').value,apiHost:document.getElementById('cApiH').value,wifiSsid:document.getElementById('cWifiS').value,smsNumbers:document.getElementById('cSmsNums').value,smsEnabled:document.getElementById('cSmsEn').checked,lteOnly:document.getElementById('cLteOnly').checked,uplinkPref:parseInt(document.getElementById('cUpPref').value)};
+  var body={env:document.getElementById('cEnv').value,siteId:document.getElementById('cSite').value,gatewayId:document.getElementById('cGw').value,apn:document.getElementById('cApn').value,mqttHost:document.getElementById('cMqttH').value,mqttPort:parseInt(document.getElementById('cMqttP').value),mqttUser:document.getElementById('cMqttU').value,apiHost:document.getElementById('cApiH').value,wifiSsid:document.getElementById('cWifiS').value,smsNumbers:document.getElementById('cSmsNums').value,smsEnabled:document.getElementById('cSmsEn').checked,callEnabled:document.getElementById('cCallEn').checked,lteOnly:document.getElementById('cLteOnly').checked,uplinkPref:parseInt(document.getElementById('cUpPref').value)};
   var p=document.getElementById('cMqttPw').value;if(p)body.mqttPass=p;
   var wp=document.getElementById('cWifiP').value;if(wp)body.wifiPass=wp;
   var ap=document.getElementById('cAdminPw').value;if(ap)body.adminPass=ap;

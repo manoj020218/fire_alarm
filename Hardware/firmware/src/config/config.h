@@ -75,6 +75,7 @@ struct GatewayConfig {
     // SMS alerting (Change 3)
     char smsNumbers[64];  // comma-separated E.164 numbers, e.g. "+9172...,+9198..."
     bool smsEnabled;      // master switch; default false
+    bool callEnabled;     // voice call alerts master switch; shares smsNumbers roster
 
     // Cellular: force LTE-only network mode. Turn ON for JIO (LTE/VoLTE-only —
     // won't attach in auto mode). Leave OFF (auto: 2G/3G/4G) for Airtel/VI/BSNL.

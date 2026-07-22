@@ -15,6 +15,24 @@ static AlarmEvent   s_alarms[MAX_ALARMS] = {};
 static uint8_t      s_count  = 0;
 static Preferences  s_prefs;
 static void (*s_publishCb)(const AlarmEvent& ev) = nullptr;
+static bool        s_ready = false;
+
+static bool has_enabled_registers() {
+    GatewayConfig& cfg = getConfig();
+    for (uint8_t i = 0; i < cfg.regCount; i++) {
+        if (cfg.regs[i].enabled && cfg.regs[i].tag[0]) return true;
+    }
+    return false;
+}
+
+static bool threshold_has_enabled_register(const char* tag) {
+    if (!tag || !tag[0]) return false;
+    GatewayConfig& cfg = getConfig();
+    for (uint8_t i = 0; i < cfg.regCount; i++) {
+        if (cfg.regs[i].enabled && strcmp(cfg.regs[i].tag, tag) == 0) return true;
+    }
+    return false;
+}
 
 // ---- NVS persistence ----------------------------------------
 static void save_state() {
@@ -87,6 +105,7 @@ static void clear_alarm(AlarmEvent* a, uint32_t ts) {
 
 void alarms_init() {
     GatewayConfig& cfg = getConfig();
+    s_ready = false;
     s_count = 0;
     // Pre-create slots for configured thresholds
     for (uint8_t i = 0; i < cfg.thresholdCount; i++) {
@@ -97,6 +116,9 @@ void alarms_init() {
     find_or_create("gateway_offline");
 
     load_state();
+    if (!has_enabled_registers()) {
+        LOG_I("ALM", "Field alarm monitoring disabled - no register map configured");
+    }
     LOG_I("ALM", "Init  slotCount=%d", s_count);
 }
 
@@ -104,6 +126,7 @@ void alarms_evaluate() {
     GatewayConfig& cfg = getConfig();
     uint32_t now = millis();  // RTC epoch injected in PART B
     RegReading* readings = modbus_readings();
+    bool haveEnabledRegs = has_enabled_registers();
 
     for (uint8_t ti = 0; ti < cfg.thresholdCount; ti++) {
         AlarmThreshold& th = cfg.thresholds[ti];
@@ -112,16 +135,24 @@ void alarms_evaluate() {
         // Find matching reading
         float val  = 0;
         bool  online = false;
+        bool  matched = false;
         for (uint8_t ri = 0; ri < cfg.regCount; ri++) {
+            if (!cfg.regs[ri].enabled) continue;
             if (strcmp(readings[ri].tag, th.tag) == 0) {
                 val    = readings[ri].value;
                 online = readings[ri].online;
+                matched = true;
                 break;
             }
         }
 
         AlarmEvent* a = find_or_create(th.tag);
         if (!a) continue;
+
+        if (!matched || !threshold_has_enabled_register(th.tag)) {
+            clear_alarm(a, now);
+            continue;
+        }
 
         if (!online) {
             // Device offline alarm
@@ -146,10 +177,15 @@ void alarms_evaluate() {
     // RS485 bus offline alarm
     AlarmEvent* busAlm = find_or_create("rs485_bus");
     if (busAlm) {
-        bool busOk = modbus_is_bus_ok();
-        if (!busOk) raise_alarm(busAlm, "rs485_offline", 0, AlarmSeverity::CRITICAL, now);
-        else         clear_alarm(busAlm, now);
+        if (!haveEnabledRegs) {
+            clear_alarm(busAlm, now);
+        } else {
+            bool busOk = modbus_is_bus_ok();
+            if (!busOk) raise_alarm(busAlm, "rs485_offline", 0, AlarmSeverity::CRITICAL, now);
+            else         clear_alarm(busAlm, now);
+        }
     }
+    s_ready = true;
 }
 
 void alarms_ack(const char* tag) {
@@ -163,9 +199,33 @@ void alarms_ack(const char* tag) {
     }
 }
 
+bool alarms_ready() {
+    return s_ready;
+}
+
 bool alarms_any_active() {
     for (uint8_t i = 0; i < s_count; i++) {
         if (s_alarms[i].active) return true;
+    }
+    return false;
+}
+
+bool alarms_any_critical_active() {
+    for (uint8_t i = 0; i < s_count; i++) {
+        if (s_alarms[i].active && s_alarms[i].severity == AlarmSeverity::CRITICAL) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool alarms_any_unacknowledged_critical_active() {
+    for (uint8_t i = 0; i < s_count; i++) {
+        if (s_alarms[i].active &&
+            s_alarms[i].severity == AlarmSeverity::CRITICAL &&
+            !s_alarms[i].acknowledged) {
+            return true;
+        }
     }
     return false;
 }

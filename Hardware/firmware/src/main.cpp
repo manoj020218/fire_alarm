@@ -23,6 +23,7 @@
 #include "mqttc/mqtt.h"
 #include "mqttc/topics.h"
 #include "sim/simsvc.h"
+#include "call/callsvc.h"
 #include "modbus/registers.h"
 #include "io/dio.h"
 #include "alarms/engine.h"
@@ -206,6 +207,8 @@ static void on_alarm_event(const AlarmEvent& ev) {
     if (ev.active && ev.severity == AlarmSeverity::CRITICAL) {
         sms_dispatch(ev);
     }
+
+    callsvc_on_alarm_event(ev);
 }
 
 // ---- Telemetry builder --------------------------------------
@@ -360,11 +363,14 @@ void setup() {
     // 12. MQTT
     mqtt_init();
 
-    // 13. WebUI + OTA
+    // 13. Voice call alert pipeline
+    callsvc_init();
+
+    // 14. WebUI + OTA
     webui_init();
     ota_init();
 
-    // 14. Watchdog (30 s)
+    // 15. Watchdog (30 s)
     esp_task_wdt_init(30, false);
     esp_task_wdt_add(NULL);
 
@@ -388,6 +394,10 @@ void loop() {
 
     // Run any queued on-demand SIM command (blocking AT, off the MQTT callback)
     simsvc_step();
+    esp_task_wdt_reset();
+
+    // Voice alert sequencing + control SMS handling
+    callsvc_step();
     esp_task_wdt_reset();
 
     // Replay SD buffer when MQTT reconnects

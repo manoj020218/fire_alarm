@@ -108,6 +108,7 @@ static uint8_t s_regRecoveryStage = 0;
 static uint8_t s_dataRecoveryStage = 0;
 static char s_effectiveApn[32] = {0};
 static uint32_t s_lastBrokerRecoveryMs = 0;
+static char s_lastCallError[96] = {0};
 
 #define POWERING_HOLD_MS       1200
 #define POWERING_SETTLE_MS     3000
@@ -119,6 +120,10 @@ static uint32_t s_lastBrokerRecoveryMs = 0;
 
 static uint32_t elapsed() {
     return millis() - s_stateTs;
+}
+
+static void set_call_error_text(const char* text) {
+    snprintf(s_lastCallError, sizeof(s_lastCallError), "%s", text ? text : "");
 }
 
 static bool modem_at_ready() {
@@ -706,23 +711,61 @@ bool modem4g_is_registered() {
 }
 
 bool modem4g_call(const char* number) {
+    if (!modem4g_call_begin(number)) return false;
+    for (int i = 0; i < 12; i++) {
+        delay(1000);
+        esp_task_wdt_reset();
+    }
+    modem4g_call_hangup();
+    return true;
+}
+
+bool modem4g_call_begin(const char* number) {
     if (!number || !number[0]) return false;
+    if (!modem4g_is_registered()) {
+        set_call_error_text("modem not registered");
+        LOG_W("4G", "Call skipped - modem not registered");
+        return false;
+    }
     esp_task_wdt_reset();
-    String cmd = "ATD";
+    String cmd = "D";
     cmd += number;
     cmd += ";";
+    String resp;
     s_modem.sendAT(cmd.c_str());
-    int r = s_modem.waitResponse(10000L);
-    if (r == 1) {
-        for (int i = 0; i < 12; i++) {
-            delay(1000);
-            esp_task_wdt_reset();
-        }
-    }
-    s_modem.sendAT(GF("+CHUP"));
-    s_modem.waitResponse(3000);
+    int r = s_modem.waitResponse(15000L, resp);
     esp_task_wdt_reset();
-    return r == 1;
+    if (r == 1) {
+        set_call_error_text("");
+        LOG_I("4G", "Call started to %s", number);
+        return true;
+    }
+
+    resp.replace("\r", " ");
+    resp.replace("\n", " ");
+    while (resp.indexOf("  ") >= 0) resp.replace("  ", " ");
+    resp.trim();
+
+    if (resp.length() == 0) {
+        snprintf(s_lastCallError, sizeof(s_lastCallError),
+                 "ATD failed (waitResponse=%d, no modem text)", r);
+    } else {
+        snprintf(s_lastCallError, sizeof(s_lastCallError), "%s", resp.c_str());
+    }
+
+    LOG_W("4G", "Call start failed for %s: %s", number, s_lastCallError);
+    return false;
+}
+
+void modem4g_call_hangup() {
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CHUP"));
+    s_modem.waitResponse(3000L);
+    esp_task_wdt_reset();
+}
+
+const char* modem4g_call_last_error() {
+    return s_lastCallError;
 }
 
 bool modem4g_send_sms(const char* number, const char* text) {
@@ -801,6 +844,26 @@ String modem4g_read_sms_raw() {
     s_modem.waitResponse(8000, res);
     esp_task_wdt_reset();
     return res;
+}
+
+String modem4g_read_sms_unread_raw() {
+    String res;
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CMGF=1"));
+    s_modem.waitResponse(1000L);
+    s_modem.sendAT(GF("+CMGL=\"REC UNREAD\""));
+    s_modem.waitResponse(8000L, res);
+    esp_task_wdt_reset();
+    return res;
+}
+
+bool modem4g_delete_sms(int index) {
+    if (index < 0) return false;
+    esp_task_wdt_reset();
+    s_modem.sendAT(GF("+CMGD="), index, GF(",0"));
+    int r = s_modem.waitResponse(3000L);
+    esp_task_wdt_reset();
+    return r == 1;
 }
 
 String modem4g_send_sms_diag(const char* number, const char* text) {

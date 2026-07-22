@@ -17,6 +17,42 @@ GatewayConfig& getConfig() { return s_cfg; }
 #define STR_GET(k, dst, def)  strlcpy(dst, s_prefs.getString(k, def).c_str(), sizeof(dst))
 #define INT_GET(k, dst, def)  dst = s_prefs.getUInt(k, def)
 
+static void save_struct_arrays() {
+    s_prefs.putUChar("regCnt", s_cfg.regCount);
+    if (s_cfg.regCount > 0) {
+        s_prefs.putBytes("regs", s_cfg.regs, s_cfg.regCount * sizeof(ModbusRegEntry));
+    } else {
+        s_prefs.remove("regs");
+    }
+
+    s_prefs.putUChar("thrCnt", s_cfg.thresholdCount);
+    if (s_cfg.thresholdCount > 0) {
+        s_prefs.putBytes("thrs", s_cfg.thresholds, s_cfg.thresholdCount * sizeof(AlarmThreshold));
+    } else {
+        s_prefs.remove("thrs");
+    }
+}
+
+static void load_struct_arrays() {
+    uint8_t regCount = s_prefs.getUChar("regCnt", s_cfg.regCount);
+    if (regCount > CONFIG_MAX_REGISTERS) regCount = CONFIG_MAX_REGISTERS;
+    size_t regBytes = s_prefs.getBytesLength("regs");
+    if (regCount > 0 && regBytes >= regCount * sizeof(ModbusRegEntry)) {
+        memset(s_cfg.regs, 0, sizeof(s_cfg.regs));
+        s_prefs.getBytes("regs", s_cfg.regs, regCount * sizeof(ModbusRegEntry));
+        s_cfg.regCount = regCount;
+    }
+
+    uint8_t thrCount = s_prefs.getUChar("thrCnt", s_cfg.thresholdCount);
+    if (thrCount > CONFIG_MAX_REGISTERS) thrCount = CONFIG_MAX_REGISTERS;
+    size_t thrBytes = s_prefs.getBytesLength("thrs");
+    if (thrCount > 0 && thrBytes >= thrCount * sizeof(AlarmThreshold)) {
+        memset(s_cfg.thresholds, 0, sizeof(s_cfg.thresholds));
+        s_prefs.getBytes("thrs", s_cfg.thresholds, thrCount * sizeof(AlarmThreshold));
+        s_cfg.thresholdCount = thrCount;
+    }
+}
+
 static void load_defaults() {
     strlcpy(s_cfg.env,       DEFAULT_ENV,          sizeof(s_cfg.env));
     bool prod = (strcmp(s_cfg.env, "prod") == 0);
@@ -39,22 +75,11 @@ static void load_defaults() {
     // SMS defaults (Change 3)
     strlcpy(s_cfg.smsNumbers, SMS_NUMBERS_DEFAULT, sizeof(s_cfg.smsNumbers));
     s_cfg.smsEnabled             = SMS_ENABLED_DEFAULT;
+    s_cfg.callEnabled            = CALL_ENABLED_DEFAULT;
     s_cfg.lteOnly                = LTE_ONLY_DEFAULT;
     s_cfg.uplinkPref             = UPLINK_PREF_DEFAULT;
     s_cfg.regCount               = 0;
     s_cfg.thresholdCount         = 0;
-
-    // Seed a small default register map
-    s_cfg.regCount = 1;
-    memset(&s_cfg.regs[0], 0, sizeof(s_cfg.regs[0]));
-    s_cfg.regs[0].slaveId = 1;
-    s_cfg.regs[0].fc      = 3;
-    s_cfg.regs[0].regAddr = 0;
-    s_cfg.regs[0].count   = 1;
-    s_cfg.regs[0].scale   = 1.0f;
-    s_cfg.regs[0].enabled = true;
-    strlcpy(s_cfg.regs[0].unit, "raw",        sizeof(s_cfg.regs[0].unit));
-    strlcpy(s_cfg.regs[0].tag,  "jockeyPump", sizeof(s_cfg.regs[0].tag));
 
     // Default thresholds
     s_cfg.thresholdCount = 2;
@@ -99,9 +124,11 @@ void config_load() {
     s_cfg.otaAuto        = s_prefs.getBool("otaAuto",  false);
     // SMS (Change 3)
     STR_GET("smsNums",   s_cfg.smsNumbers, SMS_NUMBERS_DEFAULT);
-    s_cfg.smsEnabled = s_prefs.getBool("smsEn", SMS_ENABLED_DEFAULT);
-    s_cfg.lteOnly    = s_prefs.getBool("lteOnly", LTE_ONLY_DEFAULT);
-    s_cfg.uplinkPref = s_prefs.getUChar("uplinkPref", UPLINK_PREF_DEFAULT);
+    s_cfg.smsEnabled  = s_prefs.getBool("smsEn", SMS_ENABLED_DEFAULT);
+    s_cfg.callEnabled = s_prefs.getBool("callEn", CALL_ENABLED_DEFAULT);
+    s_cfg.lteOnly     = s_prefs.getBool("lteOnly", LTE_ONLY_DEFAULT);
+    s_cfg.uplinkPref  = s_prefs.getUChar("uplinkPref", UPLINK_PREF_DEFAULT);
+    load_struct_arrays();
 
     s_prefs.end();
 
@@ -133,8 +160,10 @@ void config_save() {
     // SMS (Change 3)
     s_prefs.putString("smsNums",   s_cfg.smsNumbers);
     s_prefs.putBool  ("smsEn",     s_cfg.smsEnabled);
+    s_prefs.putBool  ("callEn",    s_cfg.callEnabled);
     s_prefs.putBool  ("lteOnly",   s_cfg.lteOnly);
     s_prefs.putUChar ("uplinkPref", s_cfg.uplinkPref);
+    save_struct_arrays();
     s_prefs.end();
     LOG_I("CFG", "Saved to NVS");
 }

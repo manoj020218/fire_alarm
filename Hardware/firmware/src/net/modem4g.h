@@ -29,6 +29,8 @@ bool modem4g_get_time(struct tm* out);
 
 bool modem4g_is_registered();
 bool modem4g_send_sms(const char* number, const char* text);
+String modem4g_read_sms_unread_raw();
+bool modem4g_delete_sms(int index);
 
 String modem4g_iccid();
 String modem4g_imsi();
@@ -38,6 +40,9 @@ String modem4g_ussd(const char* code);
 String modem4g_read_sms_raw();
 String modem4g_send_sms_diag(const char* number, const char* text);
 bool modem4g_call(const char* number);
+bool modem4g_call_begin(const char* number);
+void modem4g_call_hangup();
+const char* modem4g_call_last_error();
 
 class Client;
 Client* modem4g_get_client();

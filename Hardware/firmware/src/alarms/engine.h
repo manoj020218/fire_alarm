@@ -21,7 +21,10 @@ struct AlarmEvent {
 void   alarms_init();
 void   alarms_evaluate();   // call from scheduler; checks modbus readings + DI state
 void   alarms_ack(const char* tag);
+bool   alarms_ready();
 bool   alarms_any_active();
+bool   alarms_any_critical_active();
+bool   alarms_any_unacknowledged_critical_active();
 uint8_t alarms_active_count();
 void   alarms_set_publish_cb(void (*cb)(const AlarmEvent& ev));
 

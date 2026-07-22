@@ -63,6 +63,7 @@
 // --- SMS alerting defaults (Change 3) -----------------------
 #define SMS_NUMBERS_DEFAULT     ""          // blank = none configured
 #define SMS_ENABLED_DEFAULT     false       // off by default
+#define CALL_ENABLED_DEFAULT    false       // voice call alerts master switch
 
 // --- Cellular: LTE-only (JIO) mode --------------------------
 #define LTE_ONLY_DEFAULT        false       // OFF = auto (all operators); ON = LTE-only (JIO)

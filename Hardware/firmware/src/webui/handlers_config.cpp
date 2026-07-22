@@ -79,6 +79,7 @@ static void handle_get_config(AsyncWebServerRequest* req) {
     // SMS config (Change 3)
     doc["smsNumbers"] = cfg.smsNumbers;
     doc["smsEnabled"] = cfg.smsEnabled;
+    doc["callEnabled"] = cfg.callEnabled;
     doc["lteOnly"]    = cfg.lteOnly;
     doc["uplinkPref"] = cfg.uplinkPref;
 
@@ -155,6 +156,8 @@ static void handle_post_config(AsyncWebServerRequest* req, uint8_t* data,
         strlcpy(cfg.smsNumbers, doc["smsNumbers"].as<const char*>(), sizeof(cfg.smsNumbers));
     if (doc.containsKey("smsEnabled"))
         cfg.smsEnabled = doc["smsEnabled"].as<bool>();
+    if (doc.containsKey("callEnabled"))
+        cfg.callEnabled = doc["callEnabled"].as<bool>();
     if (doc.containsKey("lteOnly"))
         cfg.lteOnly = doc["lteOnly"].as<bool>();
     if (doc.containsKey("uplinkPref"))
@@ -186,6 +189,9 @@ static void handle_export(AsyncWebServerRequest* req) {
     doc["apiHost"] = cfg.apiHost;
     doc["apn"]     = cfg.apn;
     doc["telMs"]   = cfg.telemetryIntervalMs;
+    doc["smsNumbers"] = cfg.smsNumbers;
+    doc["smsEnabled"] = cfg.smsEnabled;
+    doc["callEnabled"] = cfg.callEnabled;
 
     JsonArray regs = doc.createNestedArray("registers");
     for (uint8_t i = 0; i < cfg.regCount; i++) {
@@ -235,6 +241,9 @@ static void handle_import(AsyncWebServerRequest* req, uint8_t* data,
     if (doc.containsKey("mqttHost")) strlcpy(cfg.mqttHost,  doc["mqttHost"], sizeof(cfg.mqttHost));
     if (doc.containsKey("mqttPort")) cfg.mqttPort = doc["mqttPort"].as<uint16_t>();
     if (doc.containsKey("apiHost"))  strlcpy(cfg.apiHost,   doc["apiHost"],  sizeof(cfg.apiHost));
+    if (doc.containsKey("smsNumbers")) strlcpy(cfg.smsNumbers, doc["smsNumbers"], sizeof(cfg.smsNumbers));
+    if (doc.containsKey("smsEnabled")) cfg.smsEnabled = doc["smsEnabled"].as<bool>();
+    if (doc.containsKey("callEnabled")) cfg.callEnabled = doc["callEnabled"].as<bool>();
 
     if (doc.containsKey("registers")) {
         JsonArray regs = doc["registers"].as<JsonArray>();
