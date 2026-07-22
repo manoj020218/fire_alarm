@@ -76,18 +76,65 @@ export const registerDevice = asyncHandler(async (req: Request, res: Response): 
   if (incomingMac && !gateway.esp32Mac) gateway.esp32Mac = incomingMac;
   if (incomingFactoryId && !gateway.factoryGatewayId) gateway.factoryGatewayId = incomingFactoryId;
 
+  // Mismatch = a bound identity anchor differs from what's presented now. esp32Mac
+  // + factoryGatewayId are immutable anchors; modemImei is included per spec §5
+  // (a modem swap is flagged once, then re-baselined below).
   const mismatch =
     (!!gateway.esp32Mac && !!incomingMac && gateway.esp32Mac !== incomingMac) ||
     (!!gateway.factoryGatewayId &&
       !!incomingFactoryId &&
-      gateway.factoryGatewayId !== incomingFactoryId);
+      gateway.factoryGatewayId !== incomingFactoryId) ||
+    (!!gateway.modemImei && !!modemImei && gateway.modemImei !== modemImei);
 
   gateway.identityMismatch = mismatch;
   gateway.identityLastVerifiedAt = new Date();
   if (mismatch) {
     logger.warn(
-      { gatewayId, boundMac: gateway.esp32Mac, presentedMac: incomingMac },
+      {
+        gatewayId,
+        boundMac: gateway.esp32Mac,
+        presentedMac: incomingMac,
+        boundImei: gateway.modemImei,
+        presentedImei: modemImei,
+      },
       'register: HARDWARE IDENTITY MISMATCH — flagged for review'
+    );
+  }
+
+  // Traceability warnings (spec §5): the same hardware identity appearing under a
+  // DIFFERENT gatewayId, or an unexpected SIM swap on a fielded gateway.
+  if (incomingMac) {
+    const dup = await Gateway.findOne({
+      esp32Mac: incomingMac,
+      gatewayId: { $ne: gateway.gatewayId },
+    })
+      .select('gatewayId')
+      .lean();
+    if (dup) {
+      logger.warn(
+        { esp32Mac: incomingMac, thisGateway: gateway.gatewayId, otherGateway: dup.gatewayId },
+        'register: esp32Mac already seen under a different gateway'
+      );
+    }
+  }
+  if (modemImei) {
+    const dup = await Gateway.findOne({
+      modemImei,
+      gatewayId: { $ne: gateway.gatewayId },
+    })
+      .select('gatewayId')
+      .lean();
+    if (dup) {
+      logger.warn(
+        { modemImei, thisGateway: gateway.gatewayId, otherGateway: dup.gatewayId },
+        'register: modemImei already seen under a different gateway'
+      );
+    }
+  }
+  if (iccid && gateway.sim?.iccid && gateway.sim.iccid !== iccid) {
+    logger.warn(
+      { gatewayId, oldIccid: gateway.sim.iccid, newIccid: iccid },
+      'register: SIM ICCID changed for a fielded gateway'
     );
   }
 

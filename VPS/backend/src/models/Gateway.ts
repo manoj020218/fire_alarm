@@ -25,14 +25,15 @@ export interface ISmsInboxItem {
   ts?: string;
 }
 
-/** Append-only audit entry for a gateway's claim code lifecycle. */
-export interface IClaimCodeEvent {
-  code: string;
-  /** 'issued' | 'claimed' | 'rotated' | 'revoked' */
-  event: string;
-  at: Date;
-  /** actor — userId/email that performed it, or 'system' */
-  by?: string;
+/**
+ * Append-only audit entry for a gateway's claim-code lifecycle.
+ * Only a HASH of the code is retained (never the plaintext) — the printed code
+ * lives in a restricted ops registry, per the identity-DB spec §6.
+ */
+export interface IClaimCodeHistoryEntry {
+  codeHash: string;
+  issuedAt: Date;
+  clearedAt?: Date;
 }
 
 /** Latest SIM/cellular status reported by the gateway (on demand or periodic). */
@@ -91,8 +92,12 @@ export interface IGateway {
   identityMismatch?: boolean;
   /** last time the device identity was checked against the bound values */
   identityLastVerifiedAt?: Date;
-  /** Append-only audit of claim-code issue/claim/rotate/revoke events */
-  claimCodeHistory?: IClaimCodeEvent[];
+  /** Hash of the currently-issued claim code (plaintext never persisted here) */
+  claimCodeHash?: string;
+  /** when the current claim code was issued */
+  claimCodeIssuedAt?: Date;
+  /** Append-only audit of claim-code issue/clear events (hashes only) */
+  claimCodeHistory?: IClaimCodeHistoryEntry[];
 }
 
 export interface IGatewayDocument extends IGateway, Document {}
@@ -173,12 +178,14 @@ const GatewaySchema = new Schema<IGatewayDocument>(
     modemImei: { type: String, trim: true, maxlength: 32 },
     identityMismatch: { type: Boolean, default: false },
     identityLastVerifiedAt: { type: Date },
+    // Claim-code retention (hashes only — never the plaintext code), per spec §6
+    claimCodeHash: { type: String, select: false },
+    claimCodeIssuedAt: { type: Date },
     claimCodeHistory: [
       {
-        code: { type: String, trim: true, uppercase: true },
-        event: { type: String, trim: true },
-        at: { type: Date, default: Date.now },
-        by: { type: String, trim: true },
+        codeHash: { type: String },
+        issuedAt: { type: Date },
+        clearedAt: { type: Date },
         _id: false,
       },
     ],
