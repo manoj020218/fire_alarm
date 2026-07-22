@@ -107,6 +107,9 @@ function deviceReading(
 
 // ── Main mapper: telemetry → DeviceData[] ─────────────────────────────────────
 export function mapTelemetryToDevices(telemetry: TelemetryDoc): DeviceData[] {
+  // A gateway that hasn't reported yet has no telemetry / no devices map — guard
+  // it so an empty/partial doc yields [] instead of throwing on Object.entries().
+  if (!telemetry || !telemetry.devices) return [];
   return Object.entries(telemetry.devices).map(([id, reading]) => ({
     id,
     name: DEVICE_NAMES[id] ?? id,
